@@ -768,7 +768,7 @@ else:
     st.warning("`comparison_df` not found. Please ensure the model comparison section was run.)")
     
 # Summary table of model accuracies
-st.write("**Model Accuracies Summary: **")
+st.write("**Model Accuracies Summary:**")
 if 'accuracy_summary_df' in locals():
     st.dataframe(accuracy_summary_df)
     # Add the bar chart for model accuracies
@@ -848,7 +848,7 @@ Here's a look at the number of unique artists appearing in the Top 50 chart each
 """)
 
 if 'unique_artists_per_day' in locals():
-    st.subheader("2.1 Daily Unique Artists in Top 50")
+    st.subheader("Daily Unique Artists in Top 50")
     fig_unique_artists, ax_unique_artists = plt.subplots(figsize=(12, 6))
     unique_artists_per_day_df = unique_artists_per_day.reset_index()
     # Assuming the date format is 'DD-MM-YYYY' based on previous processing of df['date']
