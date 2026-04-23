@@ -4,4 +4,6 @@ networkx
 matplotlib
 seaborn
 scikit-learn
-tqdm
+tqdm # Progress bar display in terminal
+transformers # Genre prediction using CLIP model
+torch

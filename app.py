@@ -24,6 +24,14 @@ st.write("This dashboard will provide insights into various aspects of the UK mu
 
 print("app.py created successfully with basic Streamlit structure.")
 
+def assign_rank_group(position):
+    if 1 <= position <= 10:
+        return 'Top 10'
+    elif 11 <= position <= 50:
+        return 'Top 11-50'
+    else:
+        return 'Other'
+
 @st.cache_data
 def load_and_preprocess_data():
     df = pd.read_csv('Atlantic_United_Kingdom.csv')
@@ -42,24 +50,14 @@ def load_and_preprocess_data():
     track_collaborations['is_collaboration'] = track_collaborations['num_artists'] > 1
 
     # Merge track_collaborations with df to get the is_collaboration status for each entry
-    df_merged = pd.merge(df, track_collaborations[['date', 'song', 'position', 'is_collaboration']],
-                       on=['date', 'song', 'position'],
-                       how='left')
-
-    # Define assign_rank_group function
-    def assign_rank_group(position):
-        if 1 <= position <= 10:
-            return 'Top 10'
-        elif 11 <= position <= 50:
-            return 'Top 11-50'
-        else:
-            return 'Other'
+    df_merged = pd.merge(df, track_collaborations[['date', 'song', 'position', 'is_collaboration']], 
+                        on=['date', 'song', 'position'], how='left')
 
     # Add rank_group column
     df_merged['rank_group'] = df_merged['position'].apply(assign_rank_group)
 
     # Convert 'date' column to datetime objects
-    df_merged['date'] = pd.to_datetime(df_merged['date'])
+    df_merged['date'] = pd.to_datetime(df_merged['date'], dayfirst=True)
 
     return df_merged
 
@@ -86,14 +84,6 @@ content_variety_index = df_merged['song'].nunique() / len(df_merged)
 
 # 5. Recreate track_collaborations (needed for avg artists per track and collaboration frequency by rank)
 # Ensure assign_rank_group is available (it's defined in load_and_preprocess_data, but needs to be accessible here)
-def assign_rank_group(position):
-    if 1 <= position <= 10:
-        return 'Top 10'
-    elif 11 <= position <= 50:
-        return 'Top 11-50'
-    else:
-        return 'Other'
-
 track_collaborations = df_merged.groupby(['date', 'song', 'position']).agg(
     num_artists=('artist', 'nunique')
 ).reset_index()
@@ -337,7 +327,6 @@ st.write("""#### Cultural Sensitivity Insights for UK Listeners:
 
 The analysis of explicit content distribution by rank group reveals an interesting trend in the UK market. The significantly higher percentage of explicit tracks in the Top 10 (46.51%) compared to tracks ranked 11-50 (31.08%) suggests that:
 
-*   **Mainstream Acceptance:** Explicit content does not appear to be a barrier to achieving top chart positions in the UK. In fact, it might even correlate with higher chart performance, indicating a degree of mainstream acceptance or perhaps a target audience that is less sensitive to explicit lyrics in popular music.
 *   **Artist Expression vs. Commercial Viability:** Artists might feel less constrained by content restrictions when aiming for top-tier success, or record labels perceive a market demand for such content among the most engaged listeners. This contrasts with markets where explicit tags might limit radio play or commercial reach.
 *   **Youth Audience Influence:** Given that popular music charts are often heavily influenced by younger demographics, this trend could reflect changing cultural norms and a greater tolerance or even preference for more direct and unfiltered lyrical content among UK youth.
 *   **Contextual Nuance:** While the overall numbers are insightful, cultural sensitivity is nuanced. Further analysis could explore specific genres, lyrical themes, or artist branding to understand the context in which explicit content is most successful and least controversial. For instance, explicit content in certain genres (e.g., hip-hop) might be more readily accepted than in others.
@@ -502,10 +491,10 @@ st.markdown("- **Implication for Artists and Producers:** To align with UK liste
 st.markdown('---')
 st.subheader('Executive Summary and KPIs')
 
-st.write("### Comprehensive UK Music Market Analysis")
+st.write("#### Comprehensive UK Music Market Analysis")
 st.write("This dashboard provides an in-depth analysis of the UK music market, covering aspects from artist dominance to content consumption patterns.")
 
-st.markdown("#### Key Findings and Insights")
+st.markdown("##### Key Findings and Insights")
 st.markdown("**1. Artist Dominance and Diversity:**")
 st.write(f"- The market shows a moderate concentration, with the **Artist Concentration Index** (Top 5 artists' share) at **{artist_concentration_index:.2f}%**. This indicates that while a few artists dominate, there's still room for others.")
 st.write(f"- The **Diversity Score** (Unique artists / Total entries) is **{diversity_score:.4f}**, suggesting a fair, but not extremely high, variety of artists making it to the charts relative to the total number of entries.")
@@ -537,7 +526,7 @@ st.markdown('---')
 print("--- Starting Data Preparation and Model Training ---")
 
 # Re-initialize df from the original CSV and perform initial preprocessing
-df = pd.read_csv('Atlantic_United_Kingdom.csv')
+df = filtered_df.copy() # Use the already filtered data for consistency with the dashboard filters
 df['artist'] = df['artist'].str.lower().str.strip()
 df['artist'] = df['artist'].astype(str).apply(lambda x: [a.strip() for a in x.split('&')])
 df = df.explode('artist')
@@ -603,7 +592,7 @@ metrics_df = metrics_df.drop(labels=['accuracy', 'macro avg', 'weighted avg'])
 metrics_df.rename(index={'0': 'Class 0 (Not Top 10)', '1': 'Class 1 (Top 10)'}, inplace=True)
 print("Logistic Regression model trained and metrics calculated.")
 
-# --- 4. Predictive Modeling - Random Forest (No Engineered Features) (from Section X) ---
+# --- 3.1 Predictive Modeling - Random Forest (No Engineered Features) (from Section X) ---
 # Use the same feature set as Logistic Regression for comparison without engineered features
 X_rf_no_eng = X_lr.copy()
 y_rf_no_eng = y_lr.copy()
@@ -618,7 +607,7 @@ rf_metrics_df = rf_metrics_df.drop(labels=['accuracy', 'macro avg', 'weighted av
 rf_metrics_df.rename(index={'0': 'Class 0 (Not Top 10)', '1': 'Class 1 (Top 10)'}, inplace=True)
 print("Random Forest model (no engineered features) trained and metrics calculated.")
 
-# --- 5. Predictive Modeling - Random Forest (With Engineered Features) (from Section XIII) ---
+# --- 3.2 Predictive Modeling - Random Forest (With Engineered Features) (from Section XIII) ---
 features_engineered_rf = [
     'duration_min', 'num_artists', 'is_explicit',
     'day_of_week', 'month', 'duration_x_num_artists', 'explicit_duration'
@@ -639,7 +628,7 @@ rf_metrics_eng_df = rf_metrics_eng_df.drop(labels=['accuracy', 'macro avg', 'wei
 rf_metrics_eng_df.rename(index={'0': 'Class 0 (Not Top 10)', '1': 'Class 1 (Top 10)'}, inplace=True)
 print("Random Forest model (with engineered features) trained and metrics calculated.")
 
-# --- 6. Model Comparison DataFrames (from Section XIV) ---
+# --- 3.3 Model Comparison DataFrames (from Section XIV) ---
 # Create comparison_df for plotting RF performance with/without engineered features
 comparison_data = []
 
@@ -679,47 +668,62 @@ accuracy_summary_df = pd.DataFrame({
 })
 print("Model comparison dataframes created.")
 
-# --- 7. Time Series Data (`unique_artists_per_day`) (from Section II, needed for dashboard) ---
-# This is derived from the initial 'df' before it's merged or processed for ML.
-# To be precise in recalculation, let's re-read the original df once more to ensure clean state.
-original_df_for_unique_artists = pd.read_csv('Atlantic_United_Kingdom.csv')
-original_df_for_unique_artists['artist'] = original_df_for_unique_artists['artist'].str.lower().str.strip()
-original_df_for_unique_artists['artist'] = original_df_for_unique_artists['artist'].astype(str).apply(lambda x: [a.strip() for a in x.split('&')])
-original_df_for_unique_artists = original_df_for_unique_artists.explode('artist')
-
-unique_artists_per_day = original_df_for_unique_artists.groupby('date')['artist'].nunique()
+# --- 4. Time Series Data (`unique_artists_per_day`) (from Section II, needed for dashboard) ---
+unique_artists_per_day = filtered_df.groupby('date')['artist'].nunique()
 print("Unique artists per day calculated for Time Series Analysis.")
 
-# --- 8. Genre Prediction Function and Application (from Section XV) ---
+# --- 5. Genre Prediction Function and Application (from Section XV) ---
+from transformers import CLIPProcessor, CLIPModel
+import torch, requests, io
+from PIL import Image
+
+# Conceptual definition of major genres
 major_genres = ['Pop', 'Rock', 'Hip-Hop/Rap', 'Jazz', 'Country',
                 'Classical', 'Dance', 'R&B/soul', 'Electronic/EDM', 'Folk',
                 'Metal', 'Blues', 'Reggae', 'Instrumental', 'Indie',
-                'OST', 'Gospel', 'Punk', 'Latin', 'Afrobeats', 'World Music']
+                'Gospel', 'Punk', 'Latin', 'Afrobeats', 'World Music']
 
-def predict_genre_from_image(image_url):
+# Load CLIP model from openai
+model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+
+def predict_genre_from_image_ai_conceptual(image_url):
+    """
+    Predict genre from album cover URL using CLIP zero-shot classification.
+    Always returns one of the major_genres.
+    """
     if pd.isna(image_url) or not isinstance(image_url, str) or not image_url.startswith('http'):
         return 'Unknown'
     try:
         response = requests.get(image_url, timeout=5)
         response.raise_for_status()
-        image = Image.open(io.BytesIO(response.content))
-        return random.choice(major_genres)
-    except requests.exceptions.RequestException as e:
-        return 'Unknown'
-    except Exception as e:
-        return 'Unknown'
+        image = Image.open(io.BytesIO(response.content)).convert("RGB")
+
+        # Compare image against all genre prompts
+        inputs = processor(text=major_genres, images=image, padding=True, return_tensors="pt")
+        with torch.no_grad():
+            outputs = model(**inputs)
+            logits_per_image = outputs.logits_per_image
+            probs = logits_per_image.softmax(dim=1)
+
+        predicted_idx = probs.argmax(-1).item()
+        return major_genres[predicted_idx]
+    except Exception:
+        return "Unknown"
+
+print("Conceptual AI-driven genre prediction function defined.\nGenre Prediction is in progress and may take some time (2-3 minutes)")
 
 # Ensure tqdm is applied correctly to pandas for progress tracking
 tqdm.pandas()
 
 unique_album_covers = df_merged['album_cover_url'].unique()
 unique_covers_df = pd.DataFrame({'album_cover_url': unique_album_covers})
-unique_covers_df['genre_predicted'] = unique_covers_df['album_cover_url'].progress_apply(predict_genre_from_image)
+unique_covers_df['genre_predicted'] = unique_covers_df['album_cover_url'].progress_apply(predict_genre_from_image_ai_conceptual)
 genre_mapping = unique_covers_df.set_index('album_cover_url')['genre_predicted'].to_dict()
 df_merged['genre'] = df_merged['album_cover_url'].map(genre_mapping)
 print("Genre prediction applied to df_merged.")
 
-# --- 9. Genre-Specific Analysis DataFrames (from Section XVI) ---
+# --- 5.1 Genre-Specific Analysis DataFrames (from Section XVI) ---
 genre_popularity_stats = df_merged.groupby('genre')['popularity'].agg(['mean', 'median', 'std']).sort_values(by='mean', ascending=False)
 genre_explicitness_percentage = df_merged.groupby('genre')['is_explicit'].mean() * 100
 genre_duration_stats = df_merged.groupby('genre')['duration_min'].agg(['mean', 'median', 'std']).sort_values(by='mean', ascending=False)
@@ -729,27 +733,25 @@ st.write("Genre-specific statistics calculated.")
 print("--- All required dataframes and variables are now prepared. ---")
 
 # --- Dashboard Title and Introduction ---
-st.subheader("**Recommendational Analysis Dashboard For UK Music Market Analysis**")
+st.header("Recommendational Analysis Dashboard For UK Music Market Analysis")
 st.markdown("""
 This dashboard presents key insights and recommendations from the UK Music Market Analysis,
 leveraging our data validation, descriptive analysis, and predictive modeling capabilities.
 """)
 
 # --- Recommendation 1: Predictive Modeling of Chart Success ---
-st.subheader("1. **Predictive Modeling of Chart Success**")
+st.subheader("**Predictive Modeling of Chart Success**")
 st.markdown("""
 Our Random Forest model, especially after careful feature engineering, demonstrated significant
 predictive power for identifying tracks likely to achieve Top 10 chart success.
-Below, you'll find the detailed performance metrics of our best model and a visual comparison
-highlighting the impact of feature engineering.
 """)
 
 # Display Classification Report (Table)
 if 'rf_metrics_eng_df' in locals():
     st.write("Random Forest Model Performance (Without Engineered Features):")
-    st.dataframe(rf_metrics_df)
+    st.dataframe(rf_metrics_df.drop(columns=['support'], errors='ignore'))
     st.write("Random Forest Model Performance (With Engineered Features):")
-    st.dataframe(rf_metrics_eng_df)
+    st.dataframe(rf_metrics_eng_df.drop(columns=['support'], errors='ignore'))
 else:
     st.warning("`rf_metrics_eng_df` or `rf_metrics_df` not found. Please ensure the predictive modeling section was run.)")
 
@@ -772,7 +774,7 @@ st.write("**Model Accuracies Summary:**")
 if 'accuracy_summary_df' in locals():
     st.dataframe(accuracy_summary_df)
     # Add the bar chart for model accuracies
-    fig_accuracy_comp, ax_accuracy_comp = plt.subplots(figsize=(10, 6))
+    fig_accuracy_comp, ax_accuracy_comp = plt.subplots(figsize=(10, 6), constrained_layout=True)
     sns.barplot(x='Model', y='Accuracy', data=accuracy_summary_df, palette='viridis', hue='Model', legend=False, ax=ax_accuracy_comp)
     ax_accuracy_comp.set_title('Comparison of Model Accuracies')
     ax_accuracy_comp.set_xlabel('Model')
@@ -786,8 +788,7 @@ else:
     st.warning("`accuracy_summary_df` not found. Please ensure the model accuracy summary section was run.)")
 
 # New 3D F1-score comparison plot
-st.write("**3D Comparison of F1-scores: Logistic Regression vs. Random Forest**")
-st.markdown("This chart compares the F1-scores for Class 0 (Not Top 10) and Class 1 (Top 10) between the Logistic Regression and Random Forest models.")
+st.write("**3D Comparison of F1-scores: Logistic Regression vs. Random Forest (Without Engineered Features):**")
 
 if 'metrics_df' in locals() and 'rf_metrics_df' in locals():
     # Extract F1-scores from the previously generated dataframes
@@ -840,16 +841,55 @@ else:
 
 st.markdown('---')
 
-# --- Recommendation 2: Time Series Analysis of Trends ---
-st.subheader("2.**Time Series Analysis of Trends**")
+# --- Section 2: Feature Engineering Visualizations (Relevant to Chart Success) ---
+st.subheader("Feature Engineering Visualizations for Chart Success")
+st.markdown("""
+Visualizations of engineered features provide insights into their relationship with chart success.
+""")
+
+st.write("**Chart Success by Day of the Week:**")
+fig_day_of_week, ax_day_of_week = plt.subplots(figsize=(10, 6), constrained_layout=True)
+sns.countplot(x='day_of_week', hue='chart_success', data=df_merged, palette='viridis', ax=ax_day_of_week)
+ax_day_of_week.set_title('Chart Success by Day of the Week')
+ax_day_of_week.set_xlabel('Day of Week (0=Monday, 6=Sunday)')
+ax_day_of_week.set_ylabel('Number of Tracks')
+ax_day_of_week.legend(title='Chart Success (0=No, 1=Yes)')
+ax_day_of_week.set_xticks(ticks=range(7), labels=['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])
+plt.tight_layout()
+st.pyplot(fig_day_of_week)
+
+st.write("**Interaction of Duration and Number of Artists vs. Popularity:**")
+fig_duration_x_artists, ax_duration_x_artists = plt.subplots(figsize=(12, 7), constrained_layout=True)
+sns.scatterplot(x='duration_x_num_artists', y='popularity', hue='chart_success', data=df_merged, palette='coolwarm', alpha=0.6, ax=ax_duration_x_artists)
+ax_duration_x_artists.set_title('Interaction of Duration and Number of Artists vs. Popularity by Chart Success')
+ax_duration_x_artists.set_xlabel('Duration (min) * Number of Artists')
+ax_duration_x_artists.set_ylabel('Popularity')
+ax_duration_x_artists.legend(title='Chart Success (0=No, 1=Yes)')
+plt.tight_layout()
+st.pyplot(fig_duration_x_artists)
+
+st.write("**Distribution of Explicit Track Duration by Chart Success:**")
+fig_explicit_duration, ax_explicit_duration = plt.subplots(figsize=(8, 6), constrained_layout=True)
+sns.violinplot(x='chart_success', y='explicit_duration', data=df_merged, palette='Set2', hue='chart_success', legend=False, ax=ax_explicit_duration)
+ax_explicit_duration.set_title('Distribution of Explicit Track Duration by Chart Success')
+ax_explicit_duration.set_xlabel('Chart Success (0=No, 1=Yes)')
+ax_explicit_duration.set_ylabel('Explicit Duration (minutes)')
+ax_explicit_duration.set_xticks(ticks=[0, 1], labels=['Not Top 10', 'Top 10'])
+plt.tight_layout()
+st.pyplot(fig_explicit_duration)
+
+st.markdown('---')
+
+# --- Recommendation 3: Time Series Analysis of Trends ---
+st.subheader("**Time Series Analysis of Trends**")
 st.markdown("""
 Analyzing trends over time can reveal seasonality, shifts in artist dominance, or changes in content preferences.
 Here's a look at the number of unique artists appearing in the Top 50 chart each day.
 """)
 
 if 'unique_artists_per_day' in locals():
-    st.subheader("Daily Unique Artists in Top 50")
-    fig_unique_artists, ax_unique_artists = plt.subplots(figsize=(12, 6))
+    st.write("**Daily Unique Artists in Top 50:**")
+    fig_unique_artists, ax_unique_artists = plt.subplots(figsize=(12, 6), constrained_layout=True)
     unique_artists_per_day_df = unique_artists_per_day.reset_index()
     # Assuming the date format is 'DD-MM-YYYY' based on previous processing of df['date']
     unique_artists_per_day_df['date'] = pd.to_datetime(unique_artists_per_day_df['date'], dayfirst=True)
@@ -866,16 +906,16 @@ else:
 
 st.markdown('---')
 
-# --- Recommendation 3: Genre-Specific Analysis ---
-st.subheader("3. **Genre-Specific Analysis (Conceptual)**")
+# --- Recommendation 4: Genre-Specific Analysis ---
+st.subheader("Genre-Specific Analysis (Conceptual)")
 st.markdown("""
 While genre prediction is currently conceptual (using random assignment for demonstration),
 we can explore how different genres might relate to popularity, explicitness, and duration.
 """)
 
 if 'genre_popularity_stats' in locals() and not df_merged.empty:
-    st.subheader("**3.1 Genre vs. Popularity**")
-    fig_genre_pop, ax_genre_pop = plt.subplots(figsize=(14, 7))
+    st.write("**Genre vs. Popularity:**")
+    fig_genre_pop, ax_genre_pop = plt.subplots(figsize=(14, 7), constrained_layout=True)
     sns.boxplot(x='genre', y='popularity', data=df_merged, palette='coolwarm', hue='genre', legend=False, order=genre_popularity_stats.index, ax=ax_genre_pop)
     ax_genre_pop.set_title('Popularity Distribution by Genre')
     ax_genre_pop.set_xlabel('Genre')
@@ -887,8 +927,8 @@ else:
     st.warning("`genre_popularity_stats` or `df_merged` not found. Please ensure the genre analysis section was run.)")
 
 if 'genre_explicitness_percentage' in locals() and not df_merged.empty:
-    st.subheader("3.2 **Genre vs. Explicitness**")
-    fig_genre_exp, ax_genre_exp = plt.subplots(figsize=(14, 7))
+    st.write("**Genre vs. Explicitness:**")
+    fig_genre_exp, ax_genre_exp = plt.subplots(figsize=(14, 7), constrained_layout=True)
     sns.barplot(x=genre_explicitness_percentage.index, y=genre_explicitness_percentage.values, palette='viridis', hue=genre_explicitness_percentage.index, legend=False, order=genre_explicitness_percentage.sort_values(ascending=False).index, ax=ax_genre_exp)
     ax_genre_exp.set_title('Percentage of Explicit Content by Genre')
     ax_genre_exp.set_xlabel('Genre')
@@ -901,8 +941,8 @@ else:
     st.warning("`genre_explicitness_percentage` or `df_merged` not found. Please ensure the genre analysis section was run.)")
 
 if 'genre_duration_stats' in locals() and not df_merged.empty:
-    st.subheader("**3.3 Genre vs. Duration**")
-    fig_genre_dur, ax_genre_dur = plt.subplots(figsize=(14, 7))
+    st.write("**Genre vs. Duration:**")
+    fig_genre_dur, ax_genre_dur = plt.subplots(figsize=(14, 7), constrained_layout=True)
     sns.boxplot(x='genre', y='duration_min', data=df_merged, palette='plasma', hue='genre', legend=False, order=genre_duration_stats.index, ax=ax_genre_dur)
     ax_genre_dur.set_title('Track Duration Distribution by Genre')
     ax_genre_dur.set_xlabel('Genre')
@@ -930,7 +970,6 @@ genre_definitions = {
     "Reggae": "Jamaican-origin music with offbeat rhythms and relaxed grooves.",
     "Instrumental": "Music without vocals, focusing purely on instruments and melodies.",
     "Indie": "Independent, often experimental music outside mainstream labels.",
-    "OST": "Original Soundtrack music composed for films, TV, or games.",
     "Gospel": "Christian religious music emphasizing vocal harmonies and worship.",
     "Punk": "Fast, raw rock music with anti-establishment themes.",
     "Latin": "Music rooted in Latin American rhythms and styles.",
@@ -940,22 +979,21 @@ genre_definitions = {
 
 # Convert dictionary to DataFrame
 df_genres = pd.DataFrame(list(genre_definitions.items()), columns=["Genre", "Definition"])
-
 # Display in Streamlit
 st.subheader("🎵 Major Song Genres and Definitions")
 st.table(df_genres)
 
 st.markdown('---')
 
-# --- Recommendation 4: Multivariate Analysis ---
-st.subheader("4. **Multivariate Analysis (3D Scatter Plot)**")
+# --- Recommendation 5: Multivariate Analysis ---
+st.subheader("Multivariate Analysis (3D Scatter Plot)")
 st.markdown("""
 This 3D scatter plot visualizes the interplay between track duration, number of artists, and popularity,
 with points colored by chart success and distinguished by duration category (short-form vs. long-form).
 """)
 
 if not df_merged.empty and 'duration_min' in df_merged.columns and 'num_artists' in df_merged.columns and 'popularity' in df_merged.columns and 'chart_success' in df_merged.columns and 'duration_category' in df_merged.columns:
-    fig_3d_scatter = plt.figure(figsize=(14, 12))
+    fig_3d_scatter = plt.figure(figsize=(14, 12), constrained_layout=True)
     ax_3d_scatter = fig_3d_scatter.add_subplot(111, projection='3d')
 
     # Plot the scatter points, using mapped markers
