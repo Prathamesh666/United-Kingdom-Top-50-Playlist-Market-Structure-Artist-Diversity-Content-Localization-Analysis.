@@ -674,35 +674,33 @@ if not filtered_df.empty:
     # Get all tracks with that max number of artists
     highest_network_tracks = collab_networks[collab_networks['num_artists'] == max_artists]
 
-    # Count how many such tracks exist
-    num_tracks_with_max = len(highest_network_tracks)
-
-    # Extract artist sets for display
-    highest_network_artists = []
+    # Build mapping: artist group → unique songs
+    network_groups = {}
     for _, row in highest_network_tracks.iterrows():
-        artists = sorted(filtered_df[
+        artists = tuple(sorted(filtered_df[
             (filtered_df['date'] == row['date']) &
             (filtered_df['song'] == row['song']) &
             (filtered_df['position'] == row['position'])
-        ]['artist'].unique())
-        highest_network_artists.append(", ".join(artists))
+        ]['artist'].unique()))
+        network_groups.setdefault(artists, set()).add(row['song'])
+
+    # Display results
+    st.markdown("**2. Collaboration Structures:**")
+    st.write(f"- Average artists per track = **{filtered_track_collaborations['num_artists'].mean():.2f}**, "
+             f"Top 10 collaboration frequency = **{filtered_collaboration_frequency_by_rank.get('Top 10', 0):.2f}%**, "
+             f"Top 11-50 = **{filtered_collaboration_frequency_by_rank.get('Top 11-50', 0):.2f}%**.")
+
+    if filtered_highest_collab[0]:
+        st.write(f"- Highest collaboration pair: **{filtered_highest_collab[0][0]}** & **{filtered_highest_collab[0][1]}** "
+                 f"with **{filtered_highest_collab[1]}** collaborations.")
+
+    if max_artists > 0:
+        st.write(f"- Highest collaboration network: **{max_artists} artists** together.")
+        st.markdown(" Artist groups with the highest number of collaborators and their unique songs:")
+        for artists, songs in network_groups.items():
+            st.markdown(f" - **{', '.join(artists)}** (unique song/songs: **{', '.join(sorted(songs))}**)")
 else:
-    max_artists, num_tracks_with_max, highest_network_artists = (0, 0, [])
-
-st.markdown("**2. Collaboration Structures:**")
-st.write(f"- Average artists per track = **{filtered_track_collaborations['num_artists'].mean():.2f}**, "
-         f"Top 10 collaboration frequency = **{filtered_collaboration_frequency_by_rank.get('Top 10', 0):.2f}%**, "
-         f"Top 11-50 = **{filtered_collaboration_frequency_by_rank.get('Top 11-50', 0):.2f}%**.")
-
-if filtered_highest_collab[0]:
-    st.write(f"- Highest collaboration pair: **{filtered_highest_collab[0][0]}** & **{filtered_highest_collab[0][1]}** "
-             f"with **{filtered_highest_collab[1]}** collaborations.")
-
-if max_artists > 0:
-    st.write(f"- Highest collaboration network: **{max_artists} artists** together "
-             f"across **{num_tracks_with_max} track(s)**.")
-    for artists in highest_network_artists:
-        st.write(f"  • {artists}")
+    max_artists, network_groups = (0, {})
 
 if is_date_range_different:
     st.write(f"- Full dataset: average artists per track = **{average_artists_per_track:.2f}**, "
@@ -927,7 +925,8 @@ print("Unique artists per day calculated for Time Series Analysis.")
 # --- 5. Genre Prediction Function and Application (from Section XV) ---
 from transformers import CLIPProcessor, CLIPModel
 import warnings
-warnings.filterwarnings("ignore", message="Accessing `__path__`")
+warnings.filterwarnings("ignore", category=FutureWarning, module="transformers")
+
 
 # Conceptual definition of major genres
 major_genres = ['Pop', 'Rock', 'Hip-Hop/Rap', 'Jazz', 'Country',
