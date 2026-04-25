@@ -12,9 +12,13 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.ensemble import RandomForestClassifier
 import seaborn as sns
-import torch, requests, io
+from transformers import CLIPProcessor, CLIPModel
 from PIL import Image
 from tqdm.auto import tqdm # For progress_apply
+import torch, requests, io, warnings
+warnings.filterwarnings("ignore", category=FutureWarning, module="transformers")
+warnings.filterwarnings("ignore", message="Accessing `__path__`", module="transformers")
+
 
 st.set_page_config(layout="wide")
 st.title('United Kingdom Music Market Analysis Dashboard')
@@ -922,11 +926,6 @@ unique_artists_per_day = filtered_df.groupby('date')['artist'].nunique()
 print("Unique artists per day calculated for Time Series Analysis.")
 
 # --- 5. Genre Prediction Function and Application (from Section XV) ---
-from transformers import CLIPProcessor, CLIPModel
-import warnings
-warnings.filterwarnings("ignore", category=FutureWarning, module="transformers")
-
-
 # Conceptual definition of major genres
 major_genres = ['Pop', 'Rock', 'Hip-Hop/Rap', 'Jazz', 'Country',
                 'Classical', 'Dance', 'R&B/soul', 'Electronic/EDM', 'Folk',
@@ -985,8 +984,13 @@ def build_genre_mapping(unique_urls):
 
 print("Conceptual AI-driven genre prediction function defined.\nGenre Prediction is in progress and may take some time (2-3 minutes)")
 
-unique_album_covers = df_merged['album_cover_url'].dropna().unique()
+# Convert ArrowStringArray to a Python list for hashing
+unique_album_covers = df_merged['album_cover_url'].dropna().unique().tolist()
+
+# Pass the list into the cached function
 genre_mapping = build_genre_mapping(unique_album_covers)
+
+# Map predictions back to the DataFrame
 df_merged['genre'] = df_merged['album_cover_url'].map(genre_mapping)
 print("Genre prediction applied to df_merged.")
 
