@@ -606,10 +606,6 @@ filtered_album_type_percentage = (filtered_df['album_type'].value_counts() / fil
 
 st.markdown("##### Key Findings and Insights")
 
-full_min_date = df_merged['date'].min().date()
-full_max_date = df_merged['date'].max().date()
-is_date_range_different = (start_date != full_min_date) or (end_date != full_max_date)
-
 # Get top artist for filtered data
 filtered_top_artist = filtered_df['artist'].value_counts().index[0] if not filtered_df.empty and len(filtered_df['artist'].value_counts()) > 0 else 'Unknown'
 filtered_top_artist_count = filtered_df['artist'].value_counts().iloc[0] if not filtered_df.empty and len(filtered_df['artist'].value_counts()) > 0 else 0
@@ -1382,13 +1378,9 @@ st.subheader('Conclusion')
 if len(filtered_df) == 0:
     st.write('The current filter selection contains no records, so the conclusion is based on the full dataset baseline only. Please adjust the filters to see dynamic UK market insights for the selected subset.')
 else:
-    full_min_date = df_merged['date'].min().date()
-    full_max_date = df_merged['date'].max().date()
-    is_date_range_different = (start_date != full_min_date) or (end_date != full_max_date)
-    
     st.write('This project provides structural and cultural intelligence into the UK music market by comparing the current filter view with the full dataset baseline. The dashboard now drives recommendations from both the selected subset and the overall UK market context.')
     
-    if is_date_range_different:
+    if not is_date_range_different:
         concentration_trend = 'more concentrated' if filtered_artist_concentration_index > artist_concentration_index else 'less concentrated' if filtered_artist_concentration_index < artist_concentration_index else 'similarly concentrated'
         explicit_trend = 'higher' if filtered_explicitness_percentage.get(True, 0) > explicitness_percentage.get(True, 0) else 'lower' if filtered_explicitness_percentage.get(True, 0) < explicitness_percentage.get(True, 0) else 'the same'
         duration_trend = 'shorter' if filtered_short_form_pct >= overall_short_form_pct else 'longer'
