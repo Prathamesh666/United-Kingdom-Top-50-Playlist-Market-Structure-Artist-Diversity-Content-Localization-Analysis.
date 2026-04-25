@@ -17,12 +17,12 @@ from PIL import Image
 from tqdm.auto import tqdm # For progress_apply
 
 st.set_page_config(layout="wide")
-st.title('UK Music Market Analysis Dashboard')
+st.title('United Kingdom Music Market Analysis Dashboard')
 
 st.write("### Welcome to the UK Music Market Analysis Dashboard!")
 st.write("This dashboard will provide insights into various aspects of the UK music market.")
 
-print("app.py created successfully with basic Streamlit structure.")
+print("Dashboard created successfully with basic Streamlit structure. Please wait for some time (about 3-4 mins) to get the advanced Streamlit structure with recommendations & conclusion.")
 
 def assign_rank_group(position):
     if 1 <= position <= 10:
@@ -377,7 +377,6 @@ if not album_type_counts_filtered.empty:
 
 else:
     st.write("No album type data available for the selected filters to display the chart.")
-
 
 st.write("\n**Percentage of each album type (Filtered Data):**")
 st.write(album_type_percentage_filtered)
@@ -1013,7 +1012,7 @@ st.write("Genre-specific statistics calculated.")
 print("--- All required dataframes and variables are now prepared. ---")
 
 # --- Dashboard Title and Introduction ---
-st.header("Recommendational Analysis Dashboard For UK Music Market Analysis")
+st.header("Recommendational Analysis Dashboard For UK Music Market Listeners")
 st.markdown("""
 This dashboard presents key insights and recommendations from the UK Music Market Analysis,
 leveraging our data validation, descriptive analysis, and predictive modeling capabilities.
@@ -1210,7 +1209,7 @@ st.markdown('---')
 # --- Recommendation 4: Genre-Specific Analysis ---
 st.subheader("Genre-Specific Analysis (Conceptual)")
 st.markdown("""
-While genre prediction is currently conceptual (using random assignment for demonstration),
+While genre prediction is currently conceptual (using CLIPModel & CLIPProcessor from OpenAI) and sensitive in nature (for prediction of genre (based on album_cover_url column as a proxy for images)),
 we can explore how different genres might relate to popularity, explicitness, and duration.
 """)
 
@@ -1423,7 +1422,7 @@ else:
         overall_genre_counts = df_merged['genre'].fillna('Unknown').value_counts()
         overall_top3 = overall_genre_counts.head(3).index.tolist()
         if overall_top3:
-            st.write(f'- Top 3 Genres: **{", ".join(overall_top3)}**, representing the most popular genres in the UK market.')
+            st.write(f'- Top 3 Genres: **{", ".join(overall_top3)}**, representing the most popular genres in the UK music market.')
         st.write('- These baseline metrics provide a comprehensive view of the UK music market dynamics.')
     
     st.write('- The dashboard is therefore useful for Atlantic Recording Corporation to identify UK listener preference indicators, collaboration strengths, and content composition trends in real time.')
