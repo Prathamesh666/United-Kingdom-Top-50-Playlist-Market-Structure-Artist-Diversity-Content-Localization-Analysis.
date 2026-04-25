@@ -11,7 +11,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.ensemble import RandomForestClassifier
-from plot_size import plot_and_show
 import seaborn as sns
 import torch, requests, io
 from PIL import Image
