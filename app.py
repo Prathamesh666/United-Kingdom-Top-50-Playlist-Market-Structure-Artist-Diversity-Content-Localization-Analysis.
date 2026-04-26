@@ -128,7 +128,7 @@ st.write("KPIs calculated successfully.")
 
 st.sidebar.header('Filter Options')
 
-# Date Range Selector
+# --- Date Range Selector ---
 min_date = df_merged['date'].min().date()
 max_date = df_merged['date'].max().date()
 
@@ -144,41 +144,77 @@ if len(date_range) == 2:
 else:
     start_date, end_date = min_date, max_date
 
-filtered_df = df_merged[(df_merged['date'].dt.date >= start_date) & (df_merged['date'].dt.date <= end_date)]
+# --- Build mask step by step ---
+mask = (
+    (df_merged['date'].dt.date >= start_date) &
+    (df_merged['date'].dt.date <= end_date)
+)
 
-# Artist Filter
-all_artists = sorted(filtered_df['artist'].unique())
+# --- Artist Filter ---
+all_artists = sorted(df_merged['artist'].unique())
 selected_artists = st.sidebar.multiselect(
     'Filter by Artist',
     options=all_artists,
-    default=all_artists # Select all by default
+    default=all_artists
 )
-
 if selected_artists:
-    filtered_df = filtered_df[filtered_df['artist'].isin(selected_artists)]
+    mask &= df_merged['artist'].isin(selected_artists)
 
-# Solo vs. Collaboration Toggle
+# --- Track Type Filter ---
 collaboration_choice = st.sidebar.radio(
     'Track Type',
     ('All Tracks', 'Solo Tracks', 'Collaborative Tracks')
 )
-
 if collaboration_choice == 'Solo Tracks':
-    filtered_df = filtered_df[filtered_df['is_collaboration'] == False]
+    mask &= df_merged['is_collaboration'] == False
 elif collaboration_choice == 'Collaborative Tracks':
-    filtered_df = filtered_df[filtered_df['is_collaboration'] == True]
+    mask &= df_merged['is_collaboration'] == True
 
-# Album Type Filter
-all_album_types = sorted(filtered_df['album_type'].unique())
+# --- Album Type Filter ---
+all_album_types = sorted(df_merged['album_type'].unique())
 selected_album_types = st.sidebar.multiselect(
     'Filter by Album Type',
     options=all_album_types,
-    default=all_album_types # Select all by default
+    default=all_album_types
 )
-
 if selected_album_types:
-    filtered_df = filtered_df[filtered_df['album_type'].isin(selected_album_types)]
+    mask &= df_merged['album_type'].isin(selected_album_types)
 
+# --- Duration Interval Filter (flexible slider 0–10 mins) ---
+duration_range = st.sidebar.slider(
+    'Filter by Duration Interval (minutes)',
+    min_value=0, max_value=10,
+    value=(0, 10)  # default full range
+)
+mask &= (df_merged['duration_min'] >= duration_range[0]) & (df_merged['duration_min'] <= duration_range[1])
+
+# --- Popularity Filter (0–100 slider) ---
+pop_min, pop_max = int(df_merged['popularity'].min()), int(df_merged['popularity'].max())
+selected_popularity = st.sidebar.slider(
+    'Filter by Popularity',
+    min_value=0, max_value=100,
+    value=(pop_min, pop_max)
+)
+mask &= (df_merged['popularity'] >= selected_popularity[0]) & (df_merged['popularity'] <= selected_popularity[1])
+
+# --- Genre Filter (20 major genres) ---
+# Conceptual definition of major genres
+major_genres = ['Pop', 'Rock', 'Hip-Hop/Rap', 'Jazz', 'Country',
+                'Classical', 'Dance', 'R&B/soul', 'Electronic/EDM', 'Folk',
+                'Metal', 'Blues', 'Reggae', 'Instrumental', 'Indie',
+                'Gospel', 'Punk', 'Latin', 'Afrobeats', 'World Music']
+selected_genres = st.sidebar.multiselect(
+    'Filter by Genre',
+    options=major_genres,
+    default=major_genres
+)
+if selected_genres and 'genre' in df_merged.columns:
+    mask &= df_merged['genre'].isin(selected_genres)
+
+# --- Apply mask once ---
+filtered_df = df_merged.loc[mask].copy()
+
+# Preview
 st.write("### Filtered Data Preview")
 st.write(filtered_df.head())
 
@@ -499,6 +535,7 @@ if not filtered_df.empty and 'popularity' in filtered_df.columns and 'duration_m
     duration_bins = [0, 2, 4, 6, 8, 10]
     duration_bin_labels = ['0-2 min', '2-4 min', '4-6 min', '6-8 min', '8-10 min']
     filtered_df['duration_range'] = pd.cut(filtered_df['duration_min'], bins=duration_bins, labels=duration_bin_labels, right=False, include_lowest=True)
+    df_merged['duration_range'] = pd.cut(df_merged['duration_min'], bins=duration_bins, labels=duration_bin_labels, right=False, include_lowest=True)   
 
     # --- Display Table: Distribution of Track Duration Ranges by Popularity Bucket ---
     st.write("\n**Distribution of Track Duration Ranges by Popularity Bucket:**")
@@ -723,6 +760,9 @@ st.write(f"- `single` = **{filtered_album_type_percentage.get('single', 0):.2f}%
 if is_date_range_different:
     st.write(f"- Full dataset: `single` = **{album_type_percentage.get('single', 0):.2f}%**, `album` = **{album_type_percentage.get('album', 0):.2f}%**.")
 
+# Define duration_range for the full dataset as well
+df_merged['duration_range'] = pd.cut(df_merged['duration_min'], bins=duration_bins, labels=duration_bin_labels, right=False, include_lowest=True)  
+    
 # Get most popular duration interval for filtered data
 if not filtered_df.empty and 'duration_range' in filtered_df.columns:
     filtered_duration_range_counts = filtered_df['duration_range'].value_counts()
@@ -922,12 +962,6 @@ unique_artists_per_day = filtered_df.groupby('date')['artist'].nunique()
 print("Unique artists per day calculated for Time Series Analysis.")
 
 # --- 5. Genre Prediction Function and Application (from Section XV) ---
-# Conceptual definition of major genres
-major_genres = ['Pop', 'Rock', 'Hip-Hop/Rap', 'Jazz', 'Country',
-                'Classical', 'Dance', 'R&B/soul', 'Electronic/EDM', 'Folk',
-                'Metal', 'Blues', 'Reggae', 'Instrumental', 'Indie',
-                'Gospel', 'Punk', 'Latin', 'Afrobeats', 'World Music']
-
 # Load CLIP model from openai
 model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
 processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
@@ -971,24 +1005,41 @@ def predict_genre_from_image_ai_conceptual(image_url):
     except Exception:
         return "Unknown"
 
+# --- Initialize or reuse genre mapping in Streamlit session state ---
+if "genre_mapping" not in st.session_state:
+    st.session_state["genre_mapping"] = {}
+
 @st.cache_data(show_spinner=False)
-def build_genre_mapping(unique_urls):
-    mapping = {}
-    for url in tqdm(unique_urls, desc="Predicting genre from cover", unit="image"):
-        mapping[url] = predict_genre_from_image_ai_conceptual(url)
+def build_genre_mapping(unique_urls, existing_mapping):
+    """
+    Predict genres only for new album cover URLs not already in mapping. Shows a Streamlit progress bar instead of tqdm.
+    """
+    mapping = dict(existing_mapping)
+    progress_bar = st.progress(0)
+    total = len(unique_urls)
+
+    for i, url in enumerate(unique_urls):
+        if url not in mapping:  # only predict if not already cached
+            mapping[url] = predict_genre_from_image_ai_conceptual(url)
+        progress_bar.progress((i + 1) / total)
+
     return mapping
+
+# --- Build or update mapping based on current filters ---
+unique_album_covers = df_merged['album_cover_url'].dropna().unique().tolist()
+st.session_state["genre_mapping"] = build_genre_mapping(
+    unique_album_covers,
+    st.session_state["genre_mapping"]
+)
+
+# Apply to full dataset
+df_merged['genre'] = df_merged['album_cover_url'].map(st.session_state["genre_mapping"])
 
 print("Conceptual AI-driven genre prediction function defined.\nGenre Prediction is in progress and may take some time (2-3 minutes)")
 
-# Convert ArrowStringArray to a Python list for hashing
-unique_album_covers = df_merged['album_cover_url'].dropna().unique().tolist()
-
-# Pass the list into the cached function
-genre_mapping = build_genre_mapping(unique_album_covers)
-
-# Map predictions back to the DataFrame
-df_merged['genre'] = df_merged['album_cover_url'].map(genre_mapping)
-print("Genre prediction applied to df_merged.")
+# --- When creating filtered_df, inherit the genre column directly using mask ---
+filtered_df = df_merged.loc[mask].copy()
+print("Genre prediction applied to your filtered dataset.") if is_date_range_different else print("Genre prediction applied to the entire dataset (full date range).")
 
 #print("Conceptual AI-driven genre prediction function defined.\nGenre Prediction is in progress and may take some time (2-3 minutes)")
 #
@@ -1380,7 +1431,7 @@ if len(filtered_df) == 0:
 else:
     st.write('This project provides structural and cultural intelligence into the UK music market by comparing the current filter view with the full dataset baseline. The dashboard now drives recommendations from both the selected subset and the overall UK market context.')
     
-    if not is_date_range_different:
+    if is_date_range_different:
         concentration_trend = 'more concentrated' if filtered_artist_concentration_index > artist_concentration_index else 'less concentrated' if filtered_artist_concentration_index < artist_concentration_index else 'similarly concentrated'
         explicit_trend = 'higher' if filtered_explicitness_percentage.get(True, 0) > explicitness_percentage.get(True, 0) else 'lower' if filtered_explicitness_percentage.get(True, 0) < explicitness_percentage.get(True, 0) else 'the same'
         duration_trend = 'shorter' if filtered_short_form_pct >= overall_short_form_pct else 'longer'
