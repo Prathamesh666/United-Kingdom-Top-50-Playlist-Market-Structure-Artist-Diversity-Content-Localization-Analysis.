@@ -19,7 +19,6 @@ import torch, requests, io, warnings
 warnings.filterwarnings("ignore", category=FutureWarning, module="transformers")
 warnings.filterwarnings("ignore", message="Accessing `__path__`", module="transformers")
 
-
 st.set_page_config(layout="wide")
 st.title('United Kingdom Music Market Analysis Dashboard')
 
@@ -197,20 +196,6 @@ selected_popularity = st.sidebar.slider(
 )
 mask &= (df_merged['popularity'] >= selected_popularity[0]) & (df_merged['popularity'] <= selected_popularity[1])
 
-# --- Genre Filter (20 major genres) ---
-# Conceptual definition of major genres
-major_genres = ['Pop', 'Rock', 'Hip-Hop/Rap', 'Jazz', 'Country',
-                'Classical', 'Dance', 'R&B/soul', 'Electronic/EDM', 'Folk',
-                'Metal', 'Blues', 'Reggae', 'Instrumental', 'Indie',
-                'Gospel', 'Punk', 'Latin', 'Afrobeats', 'World Music']
-selected_genres = st.sidebar.multiselect(
-    'Filter by Genre',
-    options=major_genres,
-    default=major_genres
-)
-if selected_genres and 'genre' in df_merged.columns:
-    mask &= df_merged['genre'].isin(selected_genres)
-
 # --- Apply mask once ---
 filtered_df = df_merged.loc[mask].copy()
 
@@ -314,12 +299,11 @@ explicitness_counts_filtered = filtered_df['is_explicit'].value_counts()
 total_tracks_filtered = explicitness_counts_filtered.sum()
 explicitness_percentage_filtered = (explicitness_counts_filtered / total_tracks_filtered) * 100
 
-st.write(f"**Overall Content Explicitness (Filtered Data):**")
-st.write(f"- Explicit Tracks: {explicitness_counts_filtered.get(True, 0)} ({explicitness_percentage_filtered.get(True, 0):.2f}%) ")
-st.write(f"- Non-Explicit Tracks: {explicitness_counts_filtered.get(False, 0)} ({explicitness_percentage_filtered.get(False, 0):.2f}%) ")
-
-import matplotlib.pyplot as plt
-import seaborn as sns # type: ignore
+colA, colB = st.columns(2)
+with colA:
+    st.write(f"**Overall Content Explicitness (Filtered Data):**")
+    st.write(f"- Explicit Tracks: {explicitness_counts_filtered.get(True, 0)} ({explicitness_percentage_filtered.get(True, 0):.2f}%) ")
+    st.write(f"- Non-Explicit Tracks: {explicitness_counts_filtered.get(False, 0)} ({explicitness_percentage_filtered.get(False, 0):.2f}%) ")
 
 # Prepare data for pie chart
 pie_data_filtered = explicitness_counts_filtered
@@ -330,32 +314,36 @@ fig_pie, ax_pie = plt.subplots(figsize=(8, 8))
 ax_pie.pie(pie_data_filtered, labels=pie_labels_filtered, autopct='%1.1f%%', startangle=90, colors=sns.color_palette('pastel'))
 ax_pie.set_title('Overall Distribution of Explicit vs. Non-Explicit Content (Filtered)')
 ax_pie.axis('equal') # Equal aspect ratio ensures that pie is drawn as a circle.
-st.pyplot(fig_pie)
+with colA:
+    st.pyplot(fig_pie)
 
-st.write('This pie chart shows the overall proportion of explicit and non-explicit tracks in the dataset based on the current filters.')
+    st.write('This pie chart shows the overall proportion of explicit and non-explicit tracks in the dataset based on the current filters.')
 
 # Calculate the percentage of explicit tracks for each rank_group in the filtered data
 explicit_percentage_by_rank_filtered = filtered_df.groupby('rank_group')['is_explicit'].mean() * 100
 
-st.write("\n**Percentage of Explicit Tracks by Rank Group (Filtered Data):**")
+with colB:
+    st.write("\n**Percentage of Explicit Tracks by Rank Group (Filtered Data):**")
 if not explicit_percentage_by_rank_filtered.empty:
     for rank_group, percentage in explicit_percentage_by_rank_filtered.items():
-        st.write(f"- {rank_group}: {percentage:.2f}%")
+        with colB:
+            st.write(f"- {rank_group}: {percentage:.2f}%")
 else:
     st.write("No data available for explicit track percentage by rank group for the selected filters.")
 
 # Create the bar chart for explicit content percentage by rank group
 if not explicit_percentage_by_rank_filtered.empty:
-    fig_bar, ax_bar = plt.subplots(figsize=(10, 6))
+    fig_bar, ax_bar = plt.subplots(figsize=(10, 8))
     sns.barplot(x=explicit_percentage_by_rank_filtered.index, y=explicit_percentage_by_rank_filtered.values, hue=explicit_percentage_by_rank_filtered.index, palette='viridis', legend=False, ax=ax_bar)
     ax_bar.set_title('Percentage of Explicit Content by Rank Group (Filtered)')
     ax_bar.set_xlabel('Rank Group')
     ax_bar.set_ylabel('Percentage of Explicit Tracks (%)')
     ax_bar.set_ylim(0, 100) # Ensure y-axis goes from 0 to 100
     plt.tight_layout()
-    st.pyplot(fig_bar)
+    with colB:
+        st.pyplot(fig_bar)
 
-    st.write('This bar chart compares the percentage of explicit tracks within different rank groups (Top 10 vs. Top 11-50) based on the current filters.')
+        st.write('This bar chart compares the percentage of explicit tracks within different rank groups (Top 10 vs. Top 11-50) based on the current filters.')
 else:
     st.write("Cannot display explicit content percentage by rank group bar chart as no data is available for the selected filters.")
 
@@ -364,28 +352,46 @@ explicit_11_50 = explicit_percentage_by_rank_filtered.get('Top 11-50', 0.0)
 explicit_other = explicit_percentage_by_rank_filtered.get('Other', None)
 explicit_difference = explicit_top10 - explicit_11_50
 
-st.write('#### Cultural Sensitivity Insights for UK Listeners:')
+st.write("#### **🎭 Cultural Sensitivity Insights for UK Listeners:**")
+
 if total_tracks_filtered == 0:
-    st.write('No explicitness data is available for the current filter selection, so insights cannot be generated at this time.')
+    with st.container():
+        st.warning("No explicitness data is available for the current filter selection, so insights cannot be generated at this time.")
 else:
-    st.markdown(f"- In the current filtered dataset, **{explicit_top10:.2f}%** of Top 10 tracks are explicit while **{explicit_11_50:.2f}%** of Top 11-50 tracks are explicit.")
-    if explicit_top10 > explicit_11_50:
-        st.markdown(f"- Explicit content is currently more prevalent in the Top 10 by **{explicit_difference:.2f} percentage points**, suggesting top-ranked UK chart entries may have a higher tolerance for direct or mature lyrical themes.")
-        st.markdown("- This higher explicitness in top ranks may reflect audience preferences for authentic, unfiltered expressions in popular music.")
-    elif explicit_top10 < explicit_11_50:
-        st.markdown(f"- Explicit content is currently more prevalent in ranks 11-50 by **{abs(explicit_difference):.2f} percentage points**, which may indicate that the highest-ranked tracks are slightly less explicit in the selected sample.")
-        st.markdown("- Lower explicitness in top ranks could suggest mainstream appeal prioritizing broader accessibility over edgy content.")
-    else:
-        st.markdown("- The explicitness rate is very similar between Top 10 and Top 11-50 tracks, suggesting a stable cultural acceptance across those chart tiers.")
-        st.markdown("- Consistent explicitness levels indicate balanced cultural norms in UK music consumption.")
+    # Main container for insights
+    with st.container():
+        # Headline metrics in columns
+        col1, col2 = st.columns(2)
+        col1.metric("Top 10 Explicit %", f"{explicit_top10:.2f}%")
+        col2.metric("Top 11-50 Explicit %", f"{explicit_11_50:.2f}%")
 
-    st.markdown("- These insights are based on the currently selected filters and may shift as the dataset changes. Genre, artist profile, and release strategy all affect how explicit content performs in the UK market.")
-    st.markdown("- For a more granular picture, examine explicitness by genre or by artist cohort, since some musical styles and fanbases are more accepting of explicit material than others.")
-    if explicit_other is not None:
-        st.markdown(f"- Tracks outside the Top 50 currently show **{explicit_other:.2f}%** explicit content, which can highlight longer-tail differences in cultural sensitivity beyond the main chart.")
-        st.markdown("- Higher explicitness in lower ranks may signal niche markets or emerging trends in UK listener demographics.")
+        # Conditional narrative cards
+        if explicit_top10 > explicit_11_50:
+            st.info(f"Explicit content is more prevalent in the **Top 10** by **{explicit_difference:.2f} percentage points**.")
+            st.markdown("➡️ This suggests UK listeners may favor authentic, unfiltered/matured lyrical themes & expressions in top-ranked entries.")
+        elif explicit_top10 < explicit_11_50:
+            st.success(f"Explicit content is more prevalent in ranks **11-50** by **{abs(explicit_difference):.2f} percentage points**.")
+            st.markdown("➡️ Lower explicitness in the Top 10 indicates mainstream appeal prioritizing accessibility over edgy content.")
+        else:
+            st.warning("Explicitness rates are very similar between Top 10 and Top 11-50 tracks.")
+            st.markdown("➡️ This reflects stable cultural acceptance across chart tiers.")
 
-st.markdown('---')
+        # Expanders for deeper insights
+        with st.expander("📊 Broader Cultural Context"):
+            st.markdown("- Insights are based on the current filters and may shift as the dataset changes.")
+            st.markdown("- Genre, artist profile, and release strategy all affect how explicit content performs in the UK market.")
+
+        with st.expander("🎶 Granular Analysis Suggestions"):
+            st.markdown("- Examine explicitness by genre or artist cohort.")
+            st.markdown("- Some musical styles and fanbases are more accepting of explicit material than others.")
+
+        if explicit_other is not None:
+            with st.expander("🌍 Beyond the Top 50"):
+                st.metric("Outside Top 50 Explicit %", f"{explicit_other:.2f}%")
+                st.markdown("- Higher explicitness in lower ranks may signal niche markets or emerging trends in UK listener demographics.")
+
+st.markdown("---")
+
 st.subheader('Album Type Distribution')
 
 # Calculate total counts for each unique value in the `album_type` column for the filtered data
@@ -395,8 +401,10 @@ album_type_counts_filtered = filtered_df['album_type'].value_counts()
 total_album_types_filtered = album_type_counts_filtered.sum()
 album_type_percentage_filtered = (album_type_counts_filtered / total_album_types_filtered) * 100
 
-st.write("\n**Total counts of each album type (Filtered Data):**")
-st.write(album_type_counts_filtered)
+colA, colB = st.columns(2)
+with colA:
+    st.write("\n**Total counts of each album type (Filtered Data):**")
+    st.write(album_type_counts_filtered)
     
 # Create the bar chart for album type distribution
 if not album_type_counts_filtered.empty:
@@ -412,14 +420,16 @@ if not album_type_counts_filtered.empty:
     ax_album_type.set_ylabel('Number of Tracks')
     plt.xticks(rotation=45, ha='right')
     # Render and close cleanly
-    st.pyplot(fig_album_type)
+    with colA:
+        st.pyplot(fig_album_type)
     plt.close(fig_album_type)
 
 else:
     st.write("No album type data available for the selected filters to display the chart.")
 
-st.write("\n**Percentage of each album type (Filtered Data):**")
-st.write(album_type_percentage_filtered)
+with colB:
+    st.write("\n**Percentage of each album type (Filtered Data):**")
+    st.write(album_type_percentage_filtered)
     
 # Create the bar chart for album type distribution (percentage form)
 if not album_type_counts_filtered.empty:
@@ -438,13 +448,14 @@ if not album_type_counts_filtered.empty:
     ax_album_type.set_ylabel('Percentage of Tracks (%)')
     plt.xticks(rotation=45, ha='right', fontsize=8)
     # Render and close cleanly
-    st.pyplot(fig_album_type)
+    with colB:
+        st.pyplot(fig_album_type)
     plt.close(fig_album_type)
 
 else:
     st.write("No album type data available for the selected filters to display the chart.")
 
-st.write('This bar chart displays the distribution of different album types (single, album, compilation) within the filtered dataset, indicating the prevalence of each release format.')
+st.write('This bar chart displays the distribution of different album types (single, album, compilation) within the filtered dataset in numerical and percentage(%) format, indicating the prevalence of each release format.')
 
 st.markdown('---')
 st.subheader('Track Duration Insights')
@@ -460,11 +471,13 @@ duration_counts_filtered = filtered_df['duration_category'].value_counts()
 total_tracks_duration_filtered = duration_counts_filtered.sum()
 duration_percentage_filtered = (duration_counts_filtered / total_tracks_duration_filtered) * 100
 
-st.write("\n**Duration Category Counts (Filtered Data):**")
-st.write(duration_counts_filtered)
-
-st.write("\n**Duration Category Percentages (Filtered Data):**")
-st.write(duration_percentage_filtered)
+colA, colB = st.columns(2)
+with colA:
+    st.write("\n**Duration Category Counts (Filtered Data):**")
+    st.write(duration_counts_filtered)
+with colB:
+    st.write("\n**Duration Category Percentages (Filtered Data):**")
+    st.write(duration_percentage_filtered)
 
 # Prepare data for pie chart
 pie_data_duration = duration_counts_filtered
@@ -556,7 +569,7 @@ if not filtered_df.empty and 'popularity' in filtered_df.columns and 'duration_m
 else:
     st.error("Cannot analyze track duration across popularity buckets. Ensure 'popularity' and 'duration_min' columns are available and data is not empty.")
 
-st.write('#### Insights into UK Listener Preference Indicators:')
+st.write("#### **🎧 Insights into UK Listener Preference Indicators**")
 
 overall_short_form_pct = duration_percentage.get('short-form', 0.0)
 overall_long_form_pct = duration_percentage.get('long-form', 0.0)
@@ -568,107 +581,97 @@ short_form_delta = filtered_short_form_pct - overall_short_form_pct
 long_form_delta = filtered_long_form_pct - overall_long_form_pct
 
 if total_tracks_duration_filtered == 0:
-    st.write('No duration data is available for the current filter selection, so insights cannot be generated at this time.')
+    with st.container():
+        st.warning("No duration data is available for the current filter selection, so insights cannot be generated at this time.")
 else:
-    st.markdown(f"- In the current filtered selection, **{filtered_short_form_pct:.2f}%** are short-form and **{filtered_long_form_pct:.2f}%** are long-form.")
-    
-    full_min_date = df_merged['date'].min().date()
-    full_max_date = df_merged['date'].max().date()
-    is_date_range_different = (start_date != full_min_date) or (end_date != full_max_date)
-    
-    if is_date_range_different:
-        st.markdown(f"- Across the full dataset, **{overall_short_form_pct:.2f}%** of tracks are short-form and **{overall_long_form_pct:.2f}%** are long-form.")
-        
-        if short_form_delta > 0:
-            st.markdown(f"- The filtered selection shows a stronger short-form bias than the full-date-range baseline by **{short_form_delta:.2f} percentage points**, suggesting the current filter captures an audience or chart segment that prefers shorter tracks.")
-            st.markdown("- This suggests evolving listener preferences toward concise content, possibly due to shorter attention spans in digital consumption.")
-        elif short_form_delta < 0:
-            st.markdown(f"- The filtered selection is slightly less dominated by short-form tracks than the full dataset by **{abs(short_form_delta):.2f} percentage points**, indicating the current filters favor comparatively longer material.")
-            st.markdown("- This indicates a niche for longer-form music in the selected period, potentially appealing to dedicated listeners seeking immersive experiences.")
+    with st.container():
+        # Headline metrics in columns
+        col1, col2 = st.columns(2)
+        col1.metric("Filtered Short-form %", f"{filtered_short_form_pct:.2f}%")
+        col2.metric("Filtered Long-form %", f"{filtered_long_form_pct:.2f}%")
+
+        # Date range comparison
+        full_min_date = df_merged['date'].min().date()
+        full_max_date = df_merged['date'].max().date()
+        is_date_range_different = (start_date != full_min_date) or (end_date != full_max_date)
+
+        if is_date_range_different:
+            col3, col4 = st.columns(2)
+            col3.metric("Overall Short-form %", f"{overall_short_form_pct:.2f}%")
+            col4.metric("Overall Long-form %", f"{overall_long_form_pct:.2f}%")
+
+            # Conditional narrative cards
+            if short_form_delta > 0:
+                st.info(f"Short-form bias stronger by **{short_form_delta:.2f} percentage points** in the filtered selection.")
+                st.markdown("➡️ Indicates evolving listener preferences toward concise content, possibly due to digital consumption habits.")
+            elif short_form_delta < 0:
+                st.success(f"Longer tracks favored by **{abs(short_form_delta):.2f} percentage points** in the filtered selection.")
+                st.markdown("➡️ Suggests niche appeal for immersive, long-form listening experiences.")
+            else:
+                st.warning("Short-form share matches the overall dataset.")
+                st.markdown("➡️ Duration preferences remain stable across the timeframe.")
+
+            # Dominance check
+            if filtered_short_form_pct >= filtered_long_form_pct:
+                st.info("Short-form tracks remain dominant in the filtered view.")
+            else:
+                st.success("Long-form tracks are more prominent in the filtered view, reflecting niche listener preferences.")
+
+            # Average duration comparison
+            avg_duration_overall = df_merged['duration_min'].mean()
+            avg_duration_filtered = filtered_df['duration_min'].mean() if not filtered_df.empty else 0.0
+            duration_delta = avg_duration_filtered - avg_duration_overall
+            
+            col5, col6 = st.columns(2)
+            col5.metric("Avg Duration (Filtered)", f"{avg_duration_filtered:.2f} min")
+            col6.metric("Avg Duration (Overall)", f"{avg_duration_overall:.2f} min")
+
+            if duration_delta > 0:
+                st.info(f"Filtered selection is longer by **{duration_delta:.2f} minutes** on average.")
+                st.markdown("➡️ Reflects a trend toward elaborate musical compositions.")
+            elif duration_delta < 0:
+                st.success(f"Filtered selection is shorter by **{abs(duration_delta):.2f} minutes** on average.")
+                st.markdown("➡️ Reinforces short-form dominance, likely driven by streaming algorithms.")
+            else:
+                st.warning("Average track duration matches the overall dataset.")
+                st.markdown("➡️ Indicates stable duration preferences across UK listeners.")
+
+            with st.expander("📊 Contextual Notes"):
+                st.markdown("- These comparisons make insights dynamic, showing whether the current filter view leans more short-form or long-form than the UK baseline.")
+                st.markdown("- Genre, release strategy, and artist profile all influence duration trends.")
+
         else:
-            st.markdown("- The short-form share in the filtered selection matches the overall dataset, indicating the filter does not materially change the duration preference profile.")
-            st.markdown("- This reflects stable duration preferences across the timeframe, suggesting consistent UK listener habits.")
-        
-        if filtered_short_form_pct >= filtered_long_form_pct:
-            st.markdown("- Short-form tracks remain dominant in the filtered view, reinforcing the broader UK preference for concise content under the selected settings.")
-        else:
-            st.markdown("- Long-form tracks are more prominent in the filtered view than in the overall dataset, which may reflect a niche listener preference or a specific subset of tracks that are more popular under the selected filters.")
-        
-        avg_duration_overall = df_merged['duration_min'].mean()
-        avg_duration_filtered = filtered_df['duration_min'].mean() if not filtered_df.empty else 0.0
-        duration_delta = avg_duration_filtered - avg_duration_overall
-        
-        st.markdown(f"- The full dataset average duration is **{avg_duration_overall:.2f} minutes**, while the filtered average is **{avg_duration_filtered:.2f} minutes**.")
-        if duration_delta > 0:
-            st.markdown(f"- This means the current filtered selection is slightly longer on average by **{duration_delta:.2f} minutes**, indicating a relative move toward longer-form listening within the selected subset.")
-            st.markdown("- This shift toward longer tracks may indicate a trend in the selected period toward more elaborate musical compositions.")
-        elif duration_delta < 0:
-            st.markdown(f"- This means the current filtered selection is slightly shorter on average by **{abs(duration_delta):.2f} minutes**, reinforcing the short-form preference in the selected subset.")
-            st.markdown("- This reinforces the dominance of short-form content, likely driven by streaming platform algorithms favoring quick engagement.")
-        else:
-            st.markdown("- Average track duration in the filtered selection is the same as the full dataset, suggesting the filter preserves the general length distribution.")
-            st.markdown("- This consistency suggests that duration preferences are stable across the UK market over time.")
-        
-        st.markdown("- These comparisons make the dashboard insights dynamic: they now show whether the current filter view is more or less short-form than the underlying UK market baseline.")
-    else:
-        if filtered_short_form_pct >= filtered_long_form_pct:
-            st.markdown("- Short-form tracks are dominant in the current selection, aligning with typical UK listener preferences for concise content.")
-        else:
-            st.markdown("- Long-form tracks are more prominent in the current selection, indicating a preference for longer musical experiences.")
-        st.markdown(f"- The average track duration in the selection is **{filtered_df['duration_min'].mean() if not filtered_df.empty else 0.0:.2f} minutes**.")
-        st.markdown("- Since the full date range is selected, no comparison is needed; this reflects the baseline UK market duration preferences.")
+            # Baseline case
+            if filtered_short_form_pct >= filtered_long_form_pct:
+                st.info("Short-form tracks dominate the current selection, aligning with UK listener preferences.")
+            else:
+                st.success("Long-form tracks are more prominent, indicating immersive listening appeal.")
+
+            avg_duration_filtered = filtered_df['duration_min'].mean() if not filtered_df.empty else 0.0
+            st.metric("Avg Duration (Selection)", f"{avg_duration_filtered:.2f} min")
+            st.markdown("➡️ Since the full date range is selected, this reflects the baseline UK market duration preferences.")
 
 #st.markdown('---')#st.subheader('Market Stucture Metrics')##st.write(f"Playlist Concentration Ratio (Top 5 artists share): {artist_concentration_index:.2f}%")#st.write(f"Diversity Score (Unique artists / Total entries): {diversity_score:.4f}")#st.write(f"Content Variety Index (Unique songs / Total entries): {content_variety_index:.4f}")
 
-st.markdown('---')
-st.subheader('Executive Summary and KPIs')
-
-st.write("#### Comprehensive UK Music Market Analysis")
-st.write("This dashboard analyzes the UK music market by comparing the current filter view against the full dataset baseline to show how the selected subset differs from the overall market.")
-
+# 1. Artist Dominance and Diversity Metrics
 filtered_total_appearances = filtered_df['artist'].value_counts()
 filtered_top_5_appearances = filtered_total_appearances.head(5).sum()
 filtered_total_all_appearances = filtered_total_appearances.sum()
 filtered_artist_concentration_index = (filtered_top_5_appearances / filtered_total_all_appearances) * 100 if filtered_total_all_appearances else 0
 filtered_diversity_score = (filtered_df['artist'].nunique() / len(filtered_df)) if len(filtered_df) else 0
 filtered_content_variety_index = (filtered_df['song'].nunique() / len(filtered_df)) if len(filtered_df) else 0
-filtered_track_collaborations = filtered_df.groupby(['date', 'song', 'position']).agg(num_artists=('artist', 'nunique')).reset_index()
-filtered_track_collaborations['is_collaboration'] = filtered_track_collaborations['num_artists'] > 1
-filtered_track_collaborations['rank_group'] = filtered_track_collaborations['position'].apply(assign_rank_group)
-filtered_collaboration_frequency_by_rank = filtered_track_collaborations.groupby('rank_group')['is_collaboration'].mean() * 100
-filtered_explicitness_counts = filtered_df['is_explicit'].value_counts()
-filtered_explicitness_percentage = (filtered_explicitness_counts / filtered_explicitness_counts.sum()) * 100 if filtered_explicitness_counts.sum() else pd.Series({True: 0.0, False: 0.0})
-filtered_explicit_percentage_by_rank = filtered_df.groupby('rank_group')['is_explicit'].mean() * 100
-filtered_album_type_percentage = (filtered_df['album_type'].value_counts() / filtered_df['album_type'].value_counts().sum() * 100) if not filtered_df['album_type'].empty else pd.Series(dtype=float)
-
-st.markdown("##### Key Findings and Insights")
-
 # Get top artist for filtered data
 filtered_top_artist = filtered_df['artist'].value_counts().index[0] if not filtered_df.empty and len(filtered_df['artist'].value_counts()) > 0 else 'Unknown'
 filtered_top_artist_count = filtered_df['artist'].value_counts().iloc[0] if not filtered_df.empty and len(filtered_df['artist'].value_counts()) > 0 else 0
-
 # Get top artist for full dataset
 full_top_artist = df_merged['artist'].value_counts().index[0] if not df_merged.empty and len(df_merged['artist'].value_counts()) > 0 else 'Unknown'
 full_top_artist_count = df_merged['artist'].value_counts().iloc[0] if not df_merged.empty and len(df_merged['artist'].value_counts()) > 0 else 0
 
-st.markdown("**1. Artist Dominance and Diversity:**")
-st.write(f"- Artist Concentration Index = **{filtered_artist_concentration_index:.2f}%**, Diversity Score = **{filtered_diversity_score:.4f}**, Content Variety Index = **{filtered_content_variety_index:.4f}**.")
-st.write(f"- Top artist: **{filtered_top_artist}** with **{filtered_top_artist_count}** appearances.")
-if is_date_range_different:
-    st.write(f"- Full dataset: Artist Concentration Index = **{artist_concentration_index:.2f}%**, Diversity Score = **{diversity_score:.4f}**, Content Variety Index = **{content_variety_index:.4f}**.")
-    st.write(f"- Full dataset top artist: **{full_top_artist}** with **{full_top_artist_count}** appearances.")
-    if filtered_artist_concentration_index > artist_concentration_index:
-        st.write(f"- The current selection is more concentrated than the overall dataset by **{filtered_artist_concentration_index - artist_concentration_index:.2f} percentage points**, suggesting fewer artists dominate in this view.")
-        st.markdown("- This increased concentration may indicate a period of hit-driven dominance, where fewer artists capture the majority of attention.")
-    elif filtered_artist_concentration_index < artist_concentration_index:
-        st.write(f"- The current selection is less concentrated than the overall dataset by **{artist_concentration_index - filtered_artist_concentration_index:.2f} percentage points**, suggesting a broader set of artists is represented in this view.")
-        st.markdown("- This broader representation suggests a more diverse market in the selected period, potentially due to emerging artists gaining traction.")
-    else:
-        st.write("- The current selection and full dataset show the same artist concentration level, indicating the filter preserves the overall market structure.")
-        st.markdown("- This consistency reflects stable market dynamics across the timeframe.")
-else:
-    st.write("- Since the full date range is selected, these metrics represent the baseline UK market artist dominance and diversity.")
-
+# 2. Artist Collaboration Metrics
+filtered_track_collaborations = filtered_df.groupby(['date', 'song', 'position']).agg(num_artists=('artist', 'nunique')).reset_index()
+filtered_track_collaborations['is_collaboration'] = filtered_track_collaborations['num_artists'] > 1
+filtered_track_collaborations['rank_group'] = filtered_track_collaborations['position'].apply(assign_rank_group)
+filtered_collaboration_frequency_by_rank = filtered_track_collaborations.groupby('rank_group')['is_collaboration'].mean() * 100
 # Get highest collaboration pair for filtered data
 if not filtered_df.empty:
     filtered_collab_pairs = []
@@ -719,48 +722,35 @@ if not filtered_df.empty:
             (filtered_df['position'] == row['position'])
         ]['artist'].unique()))
         network_groups.setdefault(artists, set()).add(row['song'])
-
-    # Display results
-    st.markdown("**2. Collaboration Structures:**")
-    st.write(f"- Average artists per track = **{filtered_track_collaborations['num_artists'].mean():.2f}**, "
-             f"Top 10 collaboration frequency = **{filtered_collaboration_frequency_by_rank.get('Top 10', 0):.2f}%**, "
-             f"Top 11-50 = **{filtered_collaboration_frequency_by_rank.get('Top 11-50', 0):.2f}%**.")
-
-    if filtered_highest_collab[0]:
-        st.write(f"- Highest collaboration pair: **{filtered_highest_collab[0][0]}** & **{filtered_highest_collab[0][1]}** "
-                 f"with **{filtered_highest_collab[1]}** collaborations.")
-
-    if max_artists > 0:
-        st.write(f"- Highest collaboration network: **{max_artists} artists** together.")
-        st.markdown(" Artist groups with the highest number of collaborators and their unique songs:")
-        for artists, songs in network_groups.items():
-            st.markdown(f" - **{', '.join(artists)}** (unique song/songs: **{', '.join(sorted(songs))}**)")
 else:
     max_artists, network_groups = (0, {})
-
-if is_date_range_different:
-    st.write(f"- Full dataset: average artists per track = **{average_artists_per_track:.2f}**, "
-             f"Top 10 collaboration frequency = **{collaboration_frequency_by_rank.get('Top 10', 0):.2f}%**, "
-             f"Top 11-50 = **{collaboration_frequency_by_rank.get('Top 11-50', 0):.2f}%**.")
-    if full_highest_collab[0]:
-        st.write(f"- Full dataset highest collaboration pair: **{full_highest_collab[0][0]}** & **{full_highest_collab[0][1]}** "
-                 f"with **{full_highest_collab[1]}** collaborations.")
+    
+# For the full dataset, we can calculate the same network metrics
+if not df_merged.empty:
+    collab_networks_full = (
+        df_merged.groupby(['date', 'song', 'position'])
+        .agg(num_artists=('artist', 'nunique'))
+        .reset_index()
+    )
+    max_artists_full = collab_networks_full['num_artists'].max()
+    highest_network_tracks_full = collab_networks_full[collab_networks_full['num_artists'] == max_artists_full]
+    network_groups_full = {}
+    for _, row in highest_network_tracks_full.iterrows():
+        artists = tuple(sorted(df_merged[
+            (df_merged['date'] == row['date']) &
+            (df_merged['song'] == row['song']) &
+            (df_merged['position'] == row['position'])
+        ]['artist'].unique()))
+        network_groups_full.setdefault(artists, set()).add(row['song'])
 else:
-    st.write("- Since the full date range is selected, these metrics represent the baseline UK market collaboration structures.")
+    max_artists_full, network_groups_full = (0, {})
 
-st.markdown("**3. Content Explicitness:**")
-st.write(f"- **{filtered_explicitness_percentage.get(True, 0):.2f}%** explicit, **{filtered_explicitness_percentage.get(False, 0):.2f}%** non-explicit.")
-st.write(f"- Top 10 explicitness = **{filtered_explicit_percentage_by_rank.get('Top 10', 0):.2f}%**, Top 11-50 = **{filtered_explicit_percentage_by_rank.get('Top 11-50', 0):.2f}%**.")
-if is_date_range_different:
-    st.write(f"- Full dataset: **{explicitness_percentage.get(True, 0):.2f}%** explicit, **{explicitness_percentage.get(False, 0):.2f}%** non-explicit.")
-    st.write(f"- Full dataset Top 10 explicitness = **{explicit_percentage_by_rank.get('Top 10', 0):.2f}%**, Top 11-50 = **{explicit_percentage_by_rank.get('Top 11-50', 0):.2f}%**.")
+filtered_explicitness_counts = filtered_df['is_explicit'].value_counts()
+filtered_explicitness_percentage = (filtered_explicitness_counts / filtered_explicitness_counts.sum()) * 100 if filtered_explicitness_counts.sum() else pd.Series({True: 0.0, False: 0.0})
+filtered_explicit_percentage_by_rank = filtered_df.groupby('rank_group')['is_explicit'].mean() * 100
+filtered_album_type_percentage = (filtered_df['album_type'].value_counts() / filtered_df['album_type'].value_counts().sum() * 100) if not filtered_df['album_type'].empty else pd.Series(dtype=float)
 
-st.markdown("**4. Album Structure and Release Strategy:**")
-st.write(f"- `single` = **{filtered_album_type_percentage.get('single', 0):.2f}%**, `album` = **{filtered_album_type_percentage.get('album', 0):.2f}%**.")
-if is_date_range_different:
-    st.write(f"- Full dataset: `single` = **{album_type_percentage.get('single', 0):.2f}%**, `album` = **{album_type_percentage.get('album', 0):.2f}%**.")
-
-# Define duration_range for the full dataset as well
+# 5. Track Duration (Define duration_range for the full dataset as well)
 df_merged['duration_range'] = pd.cut(df_merged['duration_min'], bins=duration_bins, labels=duration_bin_labels, right=False, include_lowest=True)  
     
 # Get most popular duration interval for filtered data
@@ -776,40 +766,363 @@ if 'duration_range' in df_merged.columns:
     full_most_popular_duration = full_duration_range_counts.index[0] if len(full_duration_range_counts) > 0 else 'Unknown'
 else:
     full_most_popular_duration = 'Unknown'
-
-st.markdown("**5. Track Duration and Format:**")
-st.write(f"- Short-form = **{duration_percentage_filtered.get('short-form', 0):.2f}%**, long-form = **{duration_percentage_filtered.get('long-form', 0):.2f}%**.")
-st.write(f"- Most popular duration interval: **{filtered_most_popular_duration}**.")
-if is_date_range_different:
-    st.write(f"- Full dataset: short-form = **{duration_percentage.get('short-form', 0):.2f}%**, long-form = **{duration_percentage.get('long-form', 0):.2f}%**.")
-    st.write(f"- Full dataset most popular duration interval: **{full_most_popular_duration}**.")
-
+    
 present_avg_duration = filtered_df['duration_min'].mean() if not filtered_df.empty else 0
 overall_avg_duration = df_merged['duration_min'].mean()
-if is_date_range_different:
-    if present_avg_duration > overall_avg_duration:
-        st.write(f"- The current selection is slightly longer on average (**{present_avg_duration:.2f} min**) than the full dataset (**{overall_avg_duration:.2f} min**). This suggests the selected view leans toward longer tracks.")
-        st.markdown("- This trend toward longer durations may reflect a period favoring in-depth musical experiences.")
-    elif present_avg_duration < overall_avg_duration:
-        st.write(f"- The current selection is slightly shorter on average (**{present_avg_duration:.2f} min**) than the full dataset (**{overall_avg_duration:.2f} min**). This reinforces the short-form preference.")
-        st.markdown("- This emphasis on shorter tracks could be driven by fast-paced digital consumption habits.")
-    else:
-        st.write(f"- The average track duration is equal for both the current selection and the full dataset (**{overall_avg_duration:.2f} min**), meaning the filter preserves the overall duration profile.")
-        st.markdown("- This stability indicates consistent duration preferences in the UK market.")
-else:
-    st.write(f"- The average track duration is **{present_avg_duration:.2f} min**, representing the baseline UK market.")
-
-st.markdown("#### Strategic Insights")
-if is_date_range_different:
-    st.write(f"- The current selection shows that { 'short-form content is even stronger' if duration_percentage_filtered.get('short-form',0) >= duration_percentage.get('short-form',0) else 'longer-form content is more prominent' } in this view.")
-    st.markdown("- This variation in format preference may indicate shifting consumption patterns influenced by platform algorithms or listener demographics.")
-    st.write(f"- Compared to the full dataset, the current selection { 'maintains broad collaboration strength' if filtered_collaboration_frequency_by_rank.get('Top 10',0) >= collaboration_frequency_by_rank.get('Top 10',0) else 'shows a slightly different collaboration profile' }.")
-    st.markdown("- Collaboration trends can reflect industry networking or fan preferences for diverse artist combinations.")
-    st.write("- The comparison between the current selection and the full dataset helps the team understand whether this view reflects a representative slice of the UK market or a more specialized subsegment.")
-else:
-    st.write("- Since the full date range is selected, these analytics reflect the complete UK market dynamics without need for comparison.")
 
 st.markdown('---')
+
+# 🎯 KPI Overview Row with Icons
+st.markdown("## 🎯 Market Snapshot")
+
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    st.markdown("🎤 **Artist Concentration**")
+    st.metric("", f"{filtered_artist_concentration_index:.2f}%", 
+            f"{filtered_artist_concentration_index - artist_concentration_index:.2f}%" if is_date_range_different else None)
+
+with col2:
+    st.markdown("🌐 **Diversity Score**")
+    st.metric("", f"{filtered_diversity_score:.4f}", 
+            f"{filtered_diversity_score - diversity_score:.4f}" if is_date_range_different else None)
+
+with col3:
+    st.markdown("🔞 **Explicit Content**")
+    st.metric("", f"{filtered_explicitness_percentage.get(True, 0):.2f}%", 
+            f"{filtered_explicitness_percentage.get(True, 0) - explicitness_percentage.get(True, 0):.2f}%" if is_date_range_different else None)
+
+with col4:
+    st.markdown("⏱️ **Avg Duration**")
+    st.metric("", f"{present_avg_duration:.2f} min", 
+            f"{present_avg_duration - overall_avg_duration:.2f} min" if is_date_range_different else None)
+
+col5, col6, col7, col8 = st.columns(4)
+
+with col5:
+    st.markdown("🤝 **Avg Artists/Track**")
+    st.metric("", f"{filtered_track_collaborations['num_artists'].mean():.2f}", 
+            f"{filtered_track_collaborations['num_artists'].mean() - average_artists_per_track:.2f}" if is_date_range_different else None)
+
+with col6:
+    st.markdown("📊 **Top 10 Collabs**")
+    st.metric("", f"{filtered_collaboration_frequency_by_rank.get('Top 10', 0):.2f}%", 
+            f"{filtered_collaboration_frequency_by_rank.get('Top 10', 0) - collaboration_frequency_by_rank.get('Top 10', 0):.2f}%" if is_date_range_different else None)
+
+with col7:
+    st.markdown("💿 **Singles Share**")
+    st.metric("", f"{filtered_album_type_percentage.get('single', 0):.2f}%", 
+            f"{filtered_album_type_percentage.get('single', 0) - album_type_percentage.get('single', 0):.2f}%" if is_date_range_different else None)
+
+with col8:
+    st.markdown("📀 **Albums Share**")
+    st.metric("", f"{filtered_album_type_percentage.get('album', 0):.2f}%", 
+            f"{filtered_album_type_percentage.get('album', 0) - album_type_percentage.get('album', 0):.2f}%" if is_date_range_different else None)
+
+st.markdown("---")
+
+# 🎯 Strategic Insights Snapshot
+st.markdown("## 📌 Strategic Insights Snapshot")
+
+col9, col10, col11 = st.columns(3)
+
+with col9:
+    st.markdown("🎯 **Market Structure**")
+    if is_date_range_different:
+        if filtered_artist_concentration_index > artist_concentration_index:
+            st.metric("", "Hit-driven Dominance", "↑ Concentration")
+        elif filtered_artist_concentration_index < artist_concentration_index:
+            st.metric("", "Emerging Diversity", "↓ Concentration")
+        else:
+            st.metric("", "Stable Dynamics", "→ No Change")
+    else:
+        st.metric("", "Baseline UK Market", None)
+
+with col10:
+    st.markdown("🤝 **Collaboration Trends**")
+    if is_date_range_different:
+        if filtered_collaboration_frequency_by_rank.get('Top 10',0) >= collaboration_frequency_by_rank.get('Top 10',0):
+            st.metric("", "Strong Collabs", "↑")
+        else:
+            st.metric("", "Varied Profiles", "↓")
+    else:
+        st.metric("", "Baseline Collabs", None)
+
+with col11:
+    st.markdown("⚡ **Format Preference**")
+    if is_date_range_different:
+        if duration_percentage_filtered.get('short-form',0) >= duration_percentage.get('short-form',0):
+            st.metric("", "Short-form Trend", "↑")
+        else:
+            st.metric("", "Long-form Prominence", "↑")
+    else:
+        st.metric("", "Balanced Format", None)
+
+st.markdown("---")
+st.subheader('Executive Summary and KPIs')
+
+st.write("#### Comprehensive UK Music Market Analysis")
+st.write("This dashboard analyzes the UK music market by comparing the current filter view against the full dataset baseline to show how the selected subset differs from the overall market.")
+
+st.subheader("📊 Key Insights and Findings")
+
+# 1. Artist Dominance and Diversity
+with st.container():
+    st.markdown("### 🎤 Artist Dominance & Diversity")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Concentration Index", 
+                f"{filtered_artist_concentration_index:.2f}%", 
+                f"{filtered_artist_concentration_index - artist_concentration_index:.2f}%" if is_date_range_different else None)
+    with col2:
+        st.metric("Diversity Score", 
+                f"{filtered_diversity_score:.4f}", 
+                f"{filtered_diversity_score - diversity_score:.4f}" if is_date_range_different else None)
+    with col3:
+        st.metric("Variety Index", 
+                f"{filtered_content_variety_index:.4f}", 
+                f"{filtered_content_variety_index - content_variety_index:.4f}" if is_date_range_different else None)
+    colA, colB = st.columns(2)
+    with colA:
+        st.info(f"**Top Artist:** {filtered_top_artist} ({filtered_top_artist_count} appearances)")
+    if is_date_range_different:
+        with colB:
+            st.info(f"**Market Reference:** {full_top_artist} ({full_top_artist_count} appearances)")
+        if filtered_artist_concentration_index > artist_concentration_index:
+            st.info("Selection is more concentrated → Hit-driven dominance by fewer artists.")
+        elif filtered_artist_concentration_index < artist_concentration_index:
+            st.success("Selection is less concentrated → More diverse artist pool gaining traction.")
+        else:
+            st.warning("Selection matches baseline concentration → Stable dynamics.")
+        if filtered_diversity_score > diversity_score:
+            st.success("Higher diversity score → More unique artists relative to total entries.")
+        elif filtered_diversity_score < diversity_score:
+            st.warning("Lower diversity score → Fewer unique artists relative to total entries.")
+        else:            
+            st.info("Diversity score unchanged → Similar balance of unique artists.")
+            
+        if filtered_content_variety_index > content_variety_index:
+            st.success("Higher variety index → More unique songs relative to total entries.")
+        elif filtered_content_variety_index < content_variety_index:
+            st.warning("Lower variety index → Fewer unique songs relative to total entries.")
+        else:
+            st.info("Content variety index unchanged → Similar balance of unique songs.")
+    else:
+        st.markdown("*Artists show balanced dominance with diversity maintained across the market.*")
+
+# 2. Collaboration Structures
+with st.container():
+    st.markdown("### 🤝 Collaboration Structures")
+    col4, col5, col6 = st.columns(3)
+    with col4:
+        st.metric("Avg Artists/Track", 
+                f"{filtered_track_collaborations['num_artists'].mean():.2f}", 
+                f"{filtered_track_collaborations['num_artists'].mean() - average_artists_per_track:.2f}" if is_date_range_different else None)
+    with col5:
+        st.metric("Top 10 Collab Share", 
+                f"{filtered_collaboration_frequency_by_rank.get('Top 10', 0):.2f}%", 
+                f"{filtered_collaboration_frequency_by_rank.get('Top 10', 0) - collaboration_frequency_by_rank.get('Top 10', 0):.2f}%" if is_date_range_different else None)
+    with col6:
+        st.metric("Top 11-50 Collab Share", 
+                f"{filtered_collaboration_frequency_by_rank.get('Top 11-50', 0):.2f}%", 
+                f"{filtered_collaboration_frequency_by_rank.get('Top 11-50', 0) - collaboration_frequency_by_rank.get('Top 11-50', 0):.2f}%" if is_date_range_different else None)
+    if filtered_highest_collab[0]:
+        colA, colB = st.columns(2)
+        with colA:
+            st.info(f"**Highest Pair:** {filtered_highest_collab[0][0]} & {filtered_highest_collab[0][1]} ({filtered_highest_collab[1]} collaborations)")
+        if is_date_range_different:
+            with colB:
+                st.info(f"[**Market Reference:** {full_highest_collab[0][0]} & {full_highest_collab[0][1]} ({full_highest_collab[1]} collaborations)]") # type: ignore
+            if filtered_highest_collab[1] > full_highest_collab[1]:
+                st.success("This pair is more dominant in the current selection → Strong collaborative synergy.")
+            elif filtered_highest_collab[1] < full_highest_collab[1]:
+                st.warning("This pair is less dominant in the current selection → More distributed collaborations.")
+            else:
+                st.info("This pair has the same collaboration count as the full dataset → Stable collaboration dynamics.")
+                
+    if max_artists > 0:
+        colA, colB = st.columns(2)
+        with colA:
+            st.success(f"Largest Network: {max_artists} artists together")
+            for artists, songs in network_groups.items():
+                with st.expander(f"👥 {', '.join(artists)}"):
+                    st.write(f"**Contribution:** {', '.join(sorted(songs))}")
+        if is_date_range_different:
+            with colB:
+                st.info(f"**Market Reference:** {max_artists_full} artists together")
+                for artists, songs in network_groups_full.items():
+                    with st.expander(f"👥 {', '.join(artists)}"):
+                        st.write(f"**Contribution:** {', '.join(sorted(songs))}")
+            if (max_artists < max_artists_full):
+                st.warning("Largest collaboration network is smaller in selection → More focused collaborations.")
+            else:
+                st.success("Largest collaboration network is as large or larger in selection → Strong collaborative networks persist.")
+                
+    if not is_date_range_different:
+        st.markdown("*Collaboration networks remain strong, sustaining chart success across tiers.*")
+
+# 3. Content Explicitness
+with st.container():
+    st.markdown("### 🔞 Content Explicitness")
+    col7, col8, col9, col9a = st.columns(4)
+    with col7:
+        st.metric("Explicit Share", 
+                f"{filtered_explicitness_percentage.get(True, 0):.2f}%", 
+                f"{filtered_explicitness_percentage.get(True, 0) - explicitness_percentage.get(True, 0):.2f}%" if is_date_range_different else None)
+    with col8:
+        st.metric("Non-Explicit Share", 
+                f"{filtered_explicitness_percentage.get(False, 0):.2f}%", 
+                f"{filtered_explicitness_percentage.get(False, 0) - explicitness_percentage.get(False, 0):.2f}%" if is_date_range_different else None)
+    with col9:
+        st.metric("Top 10 Explicit Share", 
+                f"{filtered_explicit_percentage_by_rank.get('Top 10', 0):.2f}%", 
+                f"{filtered_explicit_percentage_by_rank.get('Top 10', 0) - explicit_percentage_by_rank.get('Top 10', 0):.2f}%" if is_date_range_different else None)
+    with col9a:
+        st.metric("Top 11-50 Explicit Share", 
+                f"{filtered_explicit_percentage_by_rank.get('Top 11-50', 0):.2f}%", 
+                f"{filtered_explicit_percentage_by_rank.get('Top 11-50', 0) - explicit_percentage_by_rank.get('Top 11-50', 0):.2f}%" if is_date_range_different else None)
+    if not is_date_range_different:
+        st.info("*Explicit content maintains a significant of natural presence, especially in top-tier tracks, reflecting mainstream trends.*")
+        st.success("Lower explicit share → More family-friendly content.")
+    else:
+        if filtered_explicitness_percentage.get(True, 0) > explicitness_percentage.get(True, 0):
+            st.info("Higher explicit share in selection → Edgier content trend.")
+        elif filtered_explicitness_percentage.get(True, 0) < explicitness_percentage.get(True, 0):
+            st.success("Lower explicit share in selection → More family-friendly content.")
+        else:
+            st.warning("Explicit share matches baseline → Stable content preferences, appealing to both mainstream and niche audiences in different timelines.")
+
+# 4. Album Structure
+with st.container():
+    st.markdown("### 💿 Album Structure & Release Strategy")
+    col10, col11 = st.columns(2)
+    with col10:
+        st.metric("Singles Share", 
+                f"{filtered_album_type_percentage.get('single', 0):.2f}%", 
+                f"{filtered_album_type_percentage.get('single', 0) - album_type_percentage.get('single', 0):.2f}%" if is_date_range_different else None)
+    with col11:
+        st.metric("Albums Share", 
+                f"{filtered_album_type_percentage.get('album', 0):.2f}%", 
+                f"{filtered_album_type_percentage.get('album', 0) - album_type_percentage.get('album', 0):.2f}%" if is_date_range_different else None)
+    if is_date_range_different:
+        if filtered_album_type_percentage.get('single', 0) > album_type_percentage.get('single', 0):
+            st.info("Higher singles share in selection → Focus on quick-hit releases.")
+        elif filtered_album_type_percentage.get('single', 0) < album_type_percentage.get('single', 0):
+            st.success("Higher albums share in selection → Emphasis on deeper engagement.")
+        else:
+            st.warning("Singles and albums share matches baseline → Balanced release strategies catering to both quick hits and sustained engagement.")
+    else:
+        st.info("*Singles dominate quick-hit releases, while albums sustain deeper engagement.*")
+        st.success("Higher singles share in selection → Focus on quick-hit releases.")
+
+# 5. Track Duration
+with st.container():
+    st.markdown("### ⏱️ Track Duration & Format")
+    col12, col13, col14 = st.columns(3)
+    with col12:
+        st.metric("Short-form Type", 
+                f"{duration_percentage_filtered.get('short-form', 0):.2f}%", 
+                f"{duration_percentage_filtered.get('short-form', 0) - duration_percentage.get('short-form', 0):.2f}%" if is_date_range_different else None)
+    with col13:
+        st.metric("Long-form Type", 
+                f"{duration_percentage_filtered.get('long-form', 0):.2f}%", 
+                f"{duration_percentage_filtered.get('long-form', 0) - duration_percentage.get('long-form', 0):.2f}%" if is_date_range_different else None)
+    with col14:
+        st.metric("Avg Duration", 
+                f"{present_avg_duration:.2f} min", 
+                f"{present_avg_duration - overall_avg_duration:.2f} min" if is_date_range_different else None)
+    colA, colB = st.columns(2)
+    with colA:
+        st.info(f"**Most Popular Interval:** {filtered_most_popular_duration}")
+    if is_date_range_different:
+        with colB:
+            st.info(f"**Market Reference MPI:** {full_most_popular_duration}")
+        if present_avg_duration > overall_avg_duration:
+            st.info("Longer tracks → In-depth listening experiences.")
+        elif present_avg_duration < overall_avg_duration:
+            st.success("Shorter tracks → Fast-paced consumption trend.")
+        else:
+            st.warning("Stable duration → Preferences unchanged.")
+    else:
+        st.info("Baseline UK duration preferences shown.")
+
+st.markdown('---')
+
+# Strategic Insights
+st.markdown("### 📌 Strategic Insights")
+
+if is_date_range_different:
+    st.markdown("**Filtered vs Full Dataset Insights:**")
+    colA, colB, colC, colD, colE = st.columns(5)
+
+    with colA:
+        st.markdown("🎤 **Artists**")
+        if filtered_artist_concentration_index > artist_concentration_index:
+            st.info("Hit-driven dominance → Fewer artists capture attention.")
+        elif filtered_artist_concentration_index < artist_concentration_index:
+            st.success("Emerging diversity → More artists gaining traction.")
+        else:
+            st.warning("Stable dynamics → Market concentration unchanged.")
+
+    with colB:
+        st.markdown("🤝 **Collaboration**")
+        if filtered_collaboration_frequency_by_rank.get('Top 10',0) >= collaboration_frequency_by_rank.get('Top 10',0):
+            st.success("Strong collabs → Top artists maintain networking strength.")
+        else:
+            st.info("Varied profiles → Mid-tier collaborations more visible.")
+
+    with colC:
+        st.markdown("🔞 **Explicitness**")
+        if filtered_explicitness_percentage.get(True,0) > explicitness_percentage.get(True,0):
+            st.info("Higher explicit share → Audience leaning toward bold content.")
+        else:
+            st.success("Lower explicit share → Broader mainstream appeal.")
+
+    with colD:
+        st.markdown("💿 **Release Strategy**")
+        if filtered_album_type_percentage.get('single',0) > album_type_percentage.get('single',0):
+            st.info("Singles dominate → Quick-hit strategy stronger in selection.")
+        else:
+            st.success("Albums stronger → Longer engagement formats preferred.")
+
+    with colE:
+        st.markdown("⏱️ **Duration**")
+        if present_avg_duration > overall_avg_duration:
+            st.info("Longer tracks → In-depth listening experiences.")
+        elif present_avg_duration < overall_avg_duration:
+            st.success("Shorter tracks → Fast-paced consumption trend.")
+        else:
+            st.warning("Stable duration → Preferences unchanged.")
+
+    st.markdown("*This filtered view highlights shifts in artist dominance, collaboration strength, and format preferences compared to the full dataset.*")
+
+else:
+    st.markdown("**Full Market Dynamics (Complete Dataset):**")
+    colF, colG, colH, colI, colJ = st.columns(5)
+
+    with colF:
+        st.markdown("🎤 **Artists**")
+        st.info("Balanced dominance → Hit-makers coexist with diverse emerging talent.")
+
+    with colG:
+        st.markdown("🤝 **Collaboration**")
+        st.success("Strong networks → Partnerships sustain chart success across tiers.")
+
+    with colH:
+        st.markdown("🔞 **Explicitness**")
+        st.warning("Balanced explicit vs non-explicit → Platforms cater to both mainstream and niche audiences.")
+
+    with colI:
+        st.markdown("💿 **Release Strategy**")
+        st.info("Dual-track approach → Singles drive quick hits, albums maintain depth.")
+
+    with colJ:
+        st.markdown("⏱️ **Duration**")
+        st.success("Stable track lengths → Consistent listener preferences shaped by streaming algorithms.")
+
+    st.markdown("*Together, these dynamics suggest a mature, stable UK market where innovation happens within predictable frameworks — ideal for benchmarking and long-term planning.*")
+
+st.markdown("---")
 
 # --- 1. Initial Data Loading and Preprocessing (from Section IX) ---
 print("--- Starting Data Preparation and Model Training ---")
@@ -962,6 +1275,11 @@ unique_artists_per_day = filtered_df.groupby('date')['artist'].nunique()
 print("Unique artists per day calculated for Time Series Analysis.")
 
 # --- 5. Genre Prediction Function and Application (from Section XV) ---
+# Conceptual definition of major genres
+major_genres = ['Pop', 'Rock', 'Hip-Hop/Rap', 'Jazz', 'Country',
+                'Classical', 'Dance', 'R&B/soul', 'Electronic/EDM', 'Folk',
+                'Metal', 'Blues', 'Reggae', 'Instrumental', 'Indie',
+                'Gospel', 'Punk', 'Latin', 'Afrobeats', 'World Music']
 # Load CLIP model from openai
 model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
 processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
@@ -1012,53 +1330,61 @@ if "genre_mapping" not in st.session_state:
 @st.cache_data(show_spinner=False)
 def build_genre_mapping(unique_urls, existing_mapping):
     """
-    Predict genres only for new album cover URLs not already in mapping. Shows a Streamlit progress bar instead of tqdm.
+    Predict genres only for new album cover URLs not already in mapping.
+    Shows a Streamlit progress bar with percentage in the UI,
+    and a tqdm progress bar in the console logs.
     """
     mapping = dict(existing_mapping)
     progress_bar = st.progress(0)
+    progress_text = st.empty()  # placeholder for percentage text
     total = len(unique_urls)
 
-    for i, url in enumerate(unique_urls):
+    # tqdm progress bar in console
+    for i, url in enumerate(tqdm(unique_urls, desc="Genre prediction progress", unit="track")):
         if url not in mapping:  # only predict if not already cached
             mapping[url] = predict_genre_from_image_ai_conceptual(url)
+
+        percent_complete = int(((i + 1) / total) * 100)
+
+        # Update Streamlit UI
         progress_bar.progress((i + 1) / total)
+        progress_text.text(f"Progress: {percent_complete}%")
+
+    # Clear progress bar and text after completion
+    progress_bar.empty()
+    progress_text.empty()
+
+    # Optional: show completion message in UI
+    st.success("✅ Genre prediction complete!")
 
     return mapping
 
 # --- Build or update mapping based on current filters ---
 unique_album_covers = df_merged['album_cover_url'].dropna().unique().tolist()
-st.session_state["genre_mapping"] = build_genre_mapping(
-    unique_album_covers,
-    st.session_state["genre_mapping"]
-)
+st.session_state["genre_mapping"] = build_genre_mapping( unique_album_covers, st.session_state["genre_mapping"]) # type: ignore
 
 # Apply to full dataset
 df_merged['genre'] = df_merged['album_cover_url'].map(st.session_state["genre_mapping"])
-
 print("Conceptual AI-driven genre prediction function defined.\nGenre Prediction is in progress and may take some time (2-3 minutes)")
+
+# --- Genre Filter (20 major genres) ---
+selected_genres = st.sidebar.multiselect(
+    'Filter by Genre',
+    options=major_genres,
+    default=major_genres
+)
+if selected_genres and 'genre' in df_merged.columns:
+    mask &= df_merged['genre'].isin(selected_genres)
 
 # --- When creating filtered_df, inherit the genre column directly using mask ---
 filtered_df = df_merged.loc[mask].copy()
 print("Genre prediction applied to your filtered dataset.") if is_date_range_different else print("Genre prediction applied to the entire dataset (full date range).")
 
-#print("Conceptual AI-driven genre prediction function defined.\nGenre Prediction is in progress and may take some time (2-3 minutes)")
-#
-## Ensure tqdm is applied correctly to pandas for progress tracking
-#tqdm.pandas()
-#
-#unique_album_covers = df_merged['album_cover_url'].unique()
-#unique_covers_df = pd.DataFrame({'album_cover_url': unique_album_covers})
-#unique_covers_df['genre_predicted'] = unique_covers_df['album_cover_url'].progress_apply(predict_genre_from_image_ai_conceptual)
-#genre_mapping = unique_covers_df.set_index('album_cover_url')['genre_predicted'].to_dict()
-#df_merged['genre'] = df_merged['album_cover_url'].map(genre_mapping)
-#print("Genre prediction applied to df_merged.")
-
 # --- 5.1 Genre-Specific Analysis DataFrames (from Section XVI) ---
 genre_popularity_stats = df_merged.groupby('genre')['popularity'].agg(['mean', 'median', 'std']).sort_values(by='mean', ascending=False)
 genre_explicitness_percentage = df_merged.groupby('genre')['is_explicit'].mean() * 100
 genre_duration_stats = df_merged.groupby('genre')['duration_min'].agg(['mean', 'median', 'std']).sort_values(by='mean', ascending=False)
-print("Genre-specific statistics calculated.")
-st.write("Genre-specific statistics calculated.")
+print("✅ Genre-specific statistics calculated.")
 
 print("--- All required dataframes and variables are now prepared. ---")
 
@@ -1078,10 +1404,14 @@ predictive power for identifying tracks likely to achieve Top 10 chart success.
 
 # Display Classification Report (Table)
 if 'rf_metrics_eng_df' in locals():
-    st.write("Random Forest Model Performance (Without Engineered Features):")
-    st.dataframe(rf_metrics_df.drop(columns=['support'], errors='ignore'))
-    st.write("Random Forest Model Performance (With Engineered Features):")
-    st.dataframe(rf_metrics_eng_df.drop(columns=['support'], errors='ignore'))
+    colA, colB = st.columns(2)
+    st.write("**Random Forest Model Performance Comparison:**")
+    with colA:
+        st.write("Random Forest Model Performance (Without Engineered Features):")
+        st.dataframe(rf_metrics_df.drop(columns=['support'], errors='ignore'))
+    with colB:
+        st.write("Random Forest Model Performance (With Engineered Features):")
+        st.dataframe(rf_metrics_eng_df.drop(columns=['support'], errors='ignore'))
 else:
     st.warning("`rf_metrics_eng_df` or `rf_metrics_df` not found. Please ensure the predictive modeling section was run.)")
     
@@ -1425,51 +1755,74 @@ else:
 
 st.markdown('---')
 
-st.subheader('Conclusion')
+st.subheader("📌 Conclusion")
+
 if len(filtered_df) == 0:
-    st.write('The current filter selection contains no records, so the conclusion is based on the full dataset baseline only. Please adjust the filters to see dynamic UK market insights for the selected subset.')
+    with st.container():
+        st.warning("Please reload the website and wait for the OpenAI Model to predict and calculate Genre Specific Statistics for the entire date-range filter option. Then select any required date-range to see the conclusion.")
 else:
-    st.write('This project provides structural and cultural intelligence into the UK music market by comparing the current filter view with the full dataset baseline. The dashboard now drives recommendations from both the selected subset and the overall UK market context.')
-    
-    if is_date_range_different:
-        concentration_trend = 'more concentrated' if filtered_artist_concentration_index > artist_concentration_index else 'less concentrated' if filtered_artist_concentration_index < artist_concentration_index else 'similarly concentrated'
-        explicit_trend = 'higher' if filtered_explicitness_percentage.get(True, 0) > explicitness_percentage.get(True, 0) else 'lower' if filtered_explicitness_percentage.get(True, 0) < explicitness_percentage.get(True, 0) else 'the same'
-        duration_trend = 'shorter' if filtered_short_form_pct >= overall_short_form_pct else 'longer'
-        st.write(f'- The present filtered view is **{concentration_trend}** than the entire dataset: **{filtered_artist_concentration_index:.2f}%** vs **{artist_concentration_index:.2f}%** for the Artist Concentration Index.')
-        st.markdown("- This difference in concentration may reflect market saturation or breakout periods in the selected timeframe.")
-        st.write(f'- Content explicitness in the selected subset is **{explicit_trend}** than the full dataset baseline: **{filtered_explicitness_percentage.get(True, 0):.2f}%** explicit currently vs **{explicitness_percentage.get(True, 0):.2f}%** overall.')
-        st.markdown("- Variations in explicitness could be influenced by cultural shifts or platform policies in the chosen period.")
-        st.write(f'- The selected subset remains **{duration_trend}** in average track length compared to the overall UK market, with an average of **{filtered_df["duration_min"].mean():.2f} minutes** vs **{df_merged["duration_min"].mean():.2f} minutes** overall.')
-        st.markdown("- Duration shifts may indicate changing consumption patterns, such as preference for quick listens or immersive experiences.")
-        
-        overall_genre_counts = df_merged['genre'].fillna('Unknown').value_counts()
-        filtered_genre_counts = filtered_df['genre'].fillna('Unknown').value_counts()
-        overall_top3 = overall_genre_counts.head(3).index.tolist()
-        filtered_top3 = filtered_genre_counts.head(3).index.tolist()
-        if overall_top3 and filtered_top3:
-            st.write(f'- The overall top 3 predicted genres in the full dataset are **{", ".join(overall_top3)}**, while the current filtered view top 3 are **{", ".join(filtered_top3)}**.')
-            if overall_top3 == filtered_top3:
-                st.write('- The selected subset closely mirrors the full UK dataset genre composition, indicating the chosen filters preserve major listener genre preferences.')
-                st.markdown("- This consistency suggests stable genre preferences across the UK market.")
-            else:
-                st.write('- The selected subset shows a different top-genre mix than the full dataset, highlighting a more specific UK listener segment in the chosen date range or artist selection.')
-                st.markdown("- Genre shifts may point to emerging trends or regional preferences in the selected period.")
-        
-        if 'rf_accuracy_eng' in locals() and 'rf_accuracy' in locals():
-            better_model = 'with engineered features' if rf_accuracy_eng >= rf_accuracy else 'without engineered features'
-            st.write(f'- Predictive modeling indicates that the Random Forest model **{better_model}** performs stronger for the current UK market slice, reinforcing the value of feature engineering in chart success forecasting.')
-            st.markdown("- Model performance variations highlight the importance of adapting predictive approaches to specific market segments.")
-        
-        st.write('- Together, these dynamic conclusions support UK-focused strategy by highlighting whether the current filter view reflects a representative market slice or a distinctive subsegment with unique preferences.')
-    else:
-        st.write('- Since the full date range is selected, the insights reflect the complete UK market without need for comparison.')
-        st.write(f'- Artist Concentration Index: **{filtered_artist_concentration_index:.2f}%**, indicating the level of market dominance by top artists.')
-        st.write(f'- Content Explicitness: **{filtered_explicitness_percentage.get(True, 0):.2f}%** explicit, reflecting cultural norms in the UK market.')
-        st.write(f'- Average Track Duration: **{filtered_df["duration_min"].mean():.2f} minutes**, showing baseline listener preferences.')
-        overall_genre_counts = df_merged['genre'].fillna('Unknown').value_counts()
-        overall_top3 = overall_genre_counts.head(3).index.tolist()
-        if overall_top3:
-            st.write(f'- Top 3 Genres: **{", ".join(overall_top3)}**, representing the most popular genres in the UK music market.')
-        st.write('- These baseline metrics provide a comprehensive view of the UK music market dynamics.')
-    
-    st.write('- The dashboard is therefore useful for Atlantic Recording Corporation to identify UK listener preference indicators, collaboration strengths, and content composition trends in real time.')
+    with st.container():
+        st.info("This project provides both structural and cultural intelligence into the UK music market by comparing the current filter view with the full dataset baseline. Recommendations balance the selected subset with the overall UK market context.")
+
+        if is_date_range_different:
+            # Headline metrics in columns
+            col1, col2, col3 = st.columns(3)
+            concentration_trend = 'more concentrated' if filtered_artist_concentration_index > artist_concentration_index else 'less concentrated' if filtered_artist_concentration_index < artist_concentration_index else 'similarly concentrated'
+            explicit_trend = 'higher' if filtered_explicitness_percentage.get(True, 0) > explicitness_percentage.get(True, 0) else 'lower' if filtered_explicitness_percentage.get(True, 0) < explicitness_percentage.get(True, 0) else 'the same'
+            duration_trend = 'shorter' if filtered_short_form_pct >= overall_short_form_pct else 'longer'
+
+            col1.metric("Artist Concentration", f"{filtered_artist_concentration_index:.2f}%", f"{filtered_artist_concentration_index - artist_concentration_index:.2f}% vs baseline")
+            col2.metric("Explicit Content %", f"{filtered_explicitness_percentage.get(True, 0):.2f}%", f"{filtered_explicitness_percentage.get(True, 0) - explicitness_percentage.get(True, 0):.2f}% vs baseline")
+            col3.metric("Avg Duration (min)", f"{filtered_df['duration_min'].mean():.2f}", f"{filtered_df['duration_min'].mean() - df_merged['duration_min'].mean():.2f} vs baseline")
+
+            # Narrative cards
+            st.write(f"- The present filtered view is **{concentration_trend}** than the entire dataset.")
+            st.write(f"- Content explicitness is **{explicit_trend}** than the full dataset baseline.")
+            st.write(f"- The selected subset remains **{duration_trend}** in average track length compared to the overall UK market.")
+
+            # Genre composition by popularity
+            with st.expander("🎶 Genre Popularity Insights"):
+                overall_genre_popularity = df_merged.groupby('genre')['popularity'].mean().sort_values(ascending=False)
+                filtered_genre_popularity = filtered_df.groupby('genre')['popularity'].mean().sort_values(ascending=False)
+                overall_top3 = overall_genre_popularity.head(3).index.tolist()
+                filtered_top3 = filtered_genre_popularity.head(3).index.tolist()
+
+                if overall_top3 and filtered_top3:
+                    st.write(f"- Overall Top 3 Genres: **{', '.join(overall_top3)}**")
+                    st.write(f"- Filtered Top 3 Genres: **{', '.join(filtered_top3)}**")
+                    if overall_top3 == filtered_top3:
+                        st.success("Subset mirrors full dataset popularity trends → stable listener preferences.")
+                    else:
+                        st.info("Subset shows a different popularity mix → highlights emerging trends or niche preferences.")
+
+            # Predictive modeling
+            if 'rf_accuracy_eng' in locals() and 'rf_accuracy' in locals():
+                better_model = 'with engineered features' if rf_accuracy_eng >= rf_accuracy else 'without engineered features'
+                with st.expander("📊 Predictive Modeling"):
+                    st.write(f"- Random Forest model **{better_model}** performs stronger for the current UK market slice.")
+                    st.markdown("- Reinforces the value of feature engineering in chart success forecasting.")
+
+            st.info("Together, these dynamic conclusions highlight whether the current filter view reflects a representative market slice or a distinctive subsegment with unique preferences.")
+
+        else:
+            # Baseline case
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Artist Concentration", f"{filtered_artist_concentration_index:.2f}%")
+            col2.metric("Explicit Content %", f"{filtered_explicitness_percentage.get(True, 0):.2f}%")
+            col3.metric("Avg Duration (min)", f"{filtered_df['duration_min'].mean():.2f}")
+
+            overall_genre_popularity = df_merged.groupby('genre')['popularity'].mean().sort_values(ascending=False)
+            overall_top3 = overall_genre_popularity.head(3).index.tolist()
+            if overall_top3:
+                st.write(f"- Top 3 Genres by popularity: **{', '.join(overall_top3)}**, representing the most appealing genres in the UK music market.")
+
+            st.info("These baseline metrics provide a comprehensive view of the UK music market dynamics.")
+
+    st.success("✅ The dashboard is useful for Atlantic Recording Corporation to identify UK listener preference indicators, collaboration strengths, and content composition trends in real time.")
+
+    st.markdown("### 🎶 Memorable Ending")
+    st.markdown("""
+    In the rhythm of data and the melody of insights, this dashboard transforms analytics into **market intelligence**.  
+    Just as every chart-topping track finds its perfect beat, every strategy here finds its **perfect note** —  
+    guiding the UK music industry toward harmony between artistry and audience.
+    """)
