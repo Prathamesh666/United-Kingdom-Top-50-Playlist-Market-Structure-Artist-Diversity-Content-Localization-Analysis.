@@ -36,9 +36,7 @@ def assign_rank_group(position):
         return 'Other'
 
 @st.cache_data
-def load_and_preprocess_data():
-    df = pd.read_csv('Atlantic_United_Kingdom.csv')
-
+def validate_and_preprocess(df):
     # Standardize artist names
     df['artist'] = df['artist'].str.lower().str.strip()
 
@@ -46,26 +44,60 @@ def load_and_preprocess_data():
     df['artist'] = df['artist'].astype(str).apply(lambda x: [a.strip() for a in x.split('&')])
     df = df.explode('artist')
 
-    # Create track_collaborations DataFrame and identify collaborations
+    # Track collaborations
     track_collaborations = df.groupby(['date', 'song', 'position']).agg(
         num_artists=('artist', 'nunique')
     ).reset_index()
     track_collaborations['is_collaboration'] = track_collaborations['num_artists'] > 1
 
-    # Merge track_collaborations with df to get the is_collaboration status for each entry
-    df_merged = pd.merge(df, track_collaborations[['date', 'song', 'position', 'is_collaboration']], 
-                        on=['date', 'song', 'position'], how='left')
+    df_merged = pd.merge(
+        df,
+        track_collaborations[['date', 'song', 'position', 'is_collaboration']],
+        on=['date', 'song', 'position'],
+        how='left'
+    )
 
-    # Add rank_group column
+    # Rank group
     df_merged['rank_group'] = df_merged['position'].apply(assign_rank_group)
 
-    # Convert 'date' column to datetime objects
+    # Convert date
     df_merged['date'] = pd.to_datetime(df_merged['date'], dayfirst=True)
 
     return df_merged
 
-# Load the data
-df_merged = load_and_preprocess_data()
+# --- Sidebar Upload Option ---
+uploaded_file = st.sidebar.file_uploader(
+    "Upload your CSV file (optional)",
+    type=["csv"]
+)
+
+# Required schema
+required_columns = [
+    'date', 'position', 'song', 'artist', 'popularity',
+    'duration_ms', 'album_type', 'total_tracks',
+    'is_explicit', 'album_cover_url'
+]
+
+# --- Decide which dataset to use ---
+if uploaded_file is not None:
+    df_user = pd.read_csv(uploaded_file)
+
+    # Validate schema
+    if all(col in df_user.columns for col in required_columns):
+        st.success("Custom CSV uploaded successfully!")
+        df_merged = validate_and_preprocess(df_user)
+    else:
+        # Show error and required schema
+        st.error("Uploaded CSV does not satisfy analytical requirements.")
+        with st.expander("Required Columns"):
+            st.write(required_columns)
+        # Fallback to default dataset
+        df = pd.read_csv('Atlantic_United_Kingdom.csv')
+        df_merged = validate_and_preprocess(df)
+else:
+    # Default dataset
+    df = pd.read_csv('Atlantic_United_Kingdom.csv')
+    df_merged = validate_and_preprocess(df)
 
 st.write("Data loaded and preprocessed successfully.")
 
@@ -771,7 +803,6 @@ present_avg_duration = filtered_df['duration_min'].mean() if not filtered_df.emp
 overall_avg_duration = df_merged['duration_min'].mean()
 
 st.markdown('---')
-
 # 🎯 KPI Overview Row with Icons
 st.markdown("## 🎯 Market Snapshot")
 
@@ -779,44 +810,44 @@ col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     st.markdown("🎤 **Artist Concentration**")
-    st.metric("", f"{filtered_artist_concentration_index:.2f}%", 
+    st.metric("Artist Concentration Index", f"{filtered_artist_concentration_index:.2f}%", 
             f"{filtered_artist_concentration_index - artist_concentration_index:.2f}%" if is_date_range_different else None)
 
 with col2:
     st.markdown("🌐 **Diversity Score**")
-    st.metric("", f"{filtered_diversity_score:.4f}", 
+    st.metric("Diversity Score", f"{filtered_diversity_score:.4f}", 
             f"{filtered_diversity_score - diversity_score:.4f}" if is_date_range_different else None)
 
 with col3:
     st.markdown("🔞 **Explicit Content**")
-    st.metric("", f"{filtered_explicitness_percentage.get(True, 0):.2f}%", 
+    st.metric("Explicit Content %", f"{filtered_explicitness_percentage.get(True, 0):.2f}%", 
             f"{filtered_explicitness_percentage.get(True, 0) - explicitness_percentage.get(True, 0):.2f}%" if is_date_range_different else None)
 
 with col4:
     st.markdown("⏱️ **Avg Duration**")
-    st.metric("", f"{present_avg_duration:.2f} min", 
+    st.metric("Average Duration", f"{present_avg_duration:.2f} min", 
             f"{present_avg_duration - overall_avg_duration:.2f} min" if is_date_range_different else None)
 
 col5, col6, col7, col8 = st.columns(4)
 
 with col5:
     st.markdown("🤝 **Avg Artists/Track**")
-    st.metric("", f"{filtered_track_collaborations['num_artists'].mean():.2f}", 
+    st.metric("Avg Artists per Track", f"{filtered_track_collaborations['num_artists'].mean():.2f}", 
             f"{filtered_track_collaborations['num_artists'].mean() - average_artists_per_track:.2f}" if is_date_range_different else None)
 
 with col6:
     st.markdown("📊 **Top 10 Collabs**")
-    st.metric("", f"{filtered_collaboration_frequency_by_rank.get('Top 10', 0):.2f}%", 
+    st.metric("Top 10 Collaboration %", f"{filtered_collaboration_frequency_by_rank.get('Top 10', 0):.2f}%", 
             f"{filtered_collaboration_frequency_by_rank.get('Top 10', 0) - collaboration_frequency_by_rank.get('Top 10', 0):.2f}%" if is_date_range_different else None)
 
 with col7:
     st.markdown("💿 **Singles Share**")
-    st.metric("", f"{filtered_album_type_percentage.get('single', 0):.2f}%", 
+    st.metric("Singles Share %", f"{filtered_album_type_percentage.get('single', 0):.2f}%", 
             f"{filtered_album_type_percentage.get('single', 0) - album_type_percentage.get('single', 0):.2f}%" if is_date_range_different else None)
 
 with col8:
     st.markdown("📀 **Albums Share**")
-    st.metric("", f"{filtered_album_type_percentage.get('album', 0):.2f}%", 
+    st.metric("Albums Share %", f"{filtered_album_type_percentage.get('album', 0):.2f}%", 
             f"{filtered_album_type_percentage.get('album', 0) - album_type_percentage.get('album', 0):.2f}%" if is_date_range_different else None)
 
 st.markdown("---")
@@ -830,33 +861,33 @@ with col9:
     st.markdown("🎯 **Market Structure**")
     if is_date_range_different:
         if filtered_artist_concentration_index > artist_concentration_index:
-            st.metric("", "Hit-driven Dominance", "↑ Concentration")
+            st.metric("Market Structure", "Hit-driven Dominance", "↑ Concentration")
         elif filtered_artist_concentration_index < artist_concentration_index:
-            st.metric("", "Emerging Diversity", "↓ Concentration")
+            st.metric("Market Structure", "Emerging Diversity", "↓ Concentration")
         else:
-            st.metric("", "Stable Dynamics", "→ No Change")
+            st.metric("Market Structure", "Stable Dynamics", "→ No Change")
     else:
-        st.metric("", "Baseline UK Market", None)
+        st.metric("Market Structure", "Baseline UK Market", None)
 
 with col10:
     st.markdown("🤝 **Collaboration Trends**")
     if is_date_range_different:
         if filtered_collaboration_frequency_by_rank.get('Top 10',0) >= collaboration_frequency_by_rank.get('Top 10',0):
-            st.metric("", "Strong Collabs", "↑")
+            st.metric("Collaboration Trends", "Strong Collabs", "↑")
         else:
-            st.metric("", "Varied Profiles", "↓")
+            st.metric("Collaboration Trends", "Varied Profiles", "↓")
     else:
-        st.metric("", "Baseline Collabs", None)
+        st.metric("Collaboration Trends", "Baseline Collabs", None)
 
 with col11:
     st.markdown("⚡ **Format Preference**")
     if is_date_range_different:
         if duration_percentage_filtered.get('short-form',0) >= duration_percentage.get('short-form',0):
-            st.metric("", "Short-form Trend", "↑")
+            st.metric("Format Preference", "Short-form Trend", "↑")
         else:
-            st.metric("", "Long-form Prominence", "↑")
+            st.metric("Format Preference", "Long-form Prominence", "↑")
     else:
-        st.metric("", "Balanced Format", None)
+        st.metric("Format Preference", "Balanced Format", None)
 
 st.markdown("---")
 st.subheader('Executive Summary and KPIs')
@@ -1826,3 +1857,43 @@ else:
     Just as every chart-topping track finds its perfect beat, every strategy here finds its **perfect note** —  
     guiding the UK music industry toward harmony between artistry and audience.
     """)
+    
+st.markdown("---")
+st.markdown(
+    "<div style='text-align: center; color: grey; font-size: 14px;'>"
+    "🔖 Dashboard created by <b>Prathamesh Bhurke</b>"
+    "</div>",
+    unsafe_allow_html=True
+)
+st.markdown("---")
+#st.markdown(
+#    """
+#    <div style='text-align: center; color: grey; font-size: 14px;'>
+#        🔖 Dashboard created by <b>Prathamesh Bhurke</b><br>
+#        <a href="https://github.com/Prathamesh666/United-Kingdom-Music-Market-Structure-Artist-Diversity-Content-Localization-Analysis" target="_blank">
+#            📂 GitHub Repository
+#        </a>
+#    </div>
+#    """,
+#    unsafe_allow_html=True
+#)
+
+st.sidebar.markdown("---")
+st.sidebar.markdown(
+    "<div style='text-align: center; color: grey; font-size: 13px;'>"
+    "🔖 Created by <b>Prathamesh Bhurke</b>"
+    "</div>",
+    unsafe_allow_html=True
+)
+#st.sidebar.markdown("---")
+#st.sidebar.markdown(
+#    """
+#    <div style='text-align: center; color: grey; font-size: 13px;'>
+#        🔖 Created by <b>Prathamesh Bhurke</b><br>
+#        <a href="https://github.com/Prathamesh666/United-Kingdom-Music-Market-Structure-Artist-Diversity-Content-Localization-Analysis" target="_blank">
+#            📂 GitHub Repository
+#        </a>
+#    </div>
+#    """,
+#    unsafe_allow_html=True
+#)
